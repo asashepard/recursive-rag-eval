@@ -1,154 +1,105 @@
-# RLM vs RAG: A Controlled Experiment
+# Controller-Driven Retrieval Benchmark
 
-**Does breaking up document retrieval into smaller, iterative steps improve extraction accuracy—or just cost more?**
-
-This repository contains a controlled experiment comparing two approaches to extracting structured compliance obligations from regulatory documents.
-
-The RLM (Recursive Language Model) approach is inspired by ["Recursive Language Models"](https://arxiv.org/abs/2512.24601) (Zhang, Kraska & Khattab, 2025), which treats long prompts as part of an external environment that the LLM can programmatically examine and decompose.
-
-### How This Differs From the Paper
-
-The paper's RLM has the LLM write Python code in a REPL to slice context, choose chunking strategies, and recursively call itself on snippets. This implementation uses a **controller-driven** variant:
-
-| Aspect | Paper's RLM | This Implementation |
-|--------|-------------|---------------------|
-| **Control flow** | LLM writes code to decide next action | Fixed loop: discover → search → extract |
-| **Context access** | LLM slices strings (`context[1000:2000]`) | Controller calls `env.get_paragraph(id)` |
-| **Recursion** | LLM calls `llm_query()` on self-selected snippets | Controller calls LLM on each paragraph |
-| **Termination** | LLM outputs `FINAL()` when satisfied | Controller stops after budget exhausted |
-
-**Why controller-driven?** For a controlled experiment, this design is actually preferable:
-
-- **Reproducibility:** Same steps every run (LLM-driven would vary)
-- **Fair comparison:** Isolates the retrieval strategy variable without confounding LLM coding ability
-- **Budget enforcement:** Deterministic cost control (paper shows 10× variance between 25th–95th percentile)
-
-The core hypothesis—*"processing small spans iteratively beats stuffing everything into one prompt"*—is preserved. The mechanism differs, but the variable being tested is the same: **evidence consumption strategy**.
+**A controlled experiment comparing two evidence consumption strategies for regulatory compliance extraction: single-pass RAG vs. iterative Controller-Driven search with verification.**
 
 ---
 
-## The Problem
+## TL;DR
 
-Imagine you're a utility company that needs to know: *"If we have a cybersecurity incident in New Jersey, who do we notify, and how quickly?"*
-
-The answer is buried somewhere in regulatory documents—PDFs from state public utility commissions, NERC standards, DOE forms. A typical RAG system retrieves relevant chunks and asks an LLM to extract the answer. But regulatory text is dense, cross-referenced, and easy to misread.
-
-**This experiment asks:** Can we do better by searching more carefully?
-
----
-
-## Two Approaches
-
-### RAG (Retrieval-Augmented Generation)
-The standard approach. Retrieve the top-10 most relevant document chunks, concatenate them, and ask the LLM to extract obligations in one shot.
-
-- **Pros:** Fast, cheap, simple
-- **Cons:** May miss details buried in long context; no recovery if first retrieval is wrong
-
-### RLM (Recursive Language Model)
-An iterative approach. Search for relevant documents, then search within each document for specific paragraphs, extract from each paragraph separately. After extraction, a **verification step** checks that each obligation is actually supported by the cited evidence, and a **repair step** can fill missing fields (deadline, notify_who) from the same paragraph.
-
-**Key techniques:**
-- **Query Expansion:** Adds synonym variants (notification ↔ report, incident ↔ breach) to improve BM25 recall
-- **Contextual Windowing:** Includes the preceding paragraph to catch obligations split across boundaries
-- **Multi-obligation Extraction:** Extracts ALL obligations from a paragraph, not just the first match
-
-- **Pros:** Focused attention on smaller text spans; verification prevents hallucinated obligations; repair fills missing fields; query expansion finds more relevant paragraphs
-- **Cons:** Slower, more expensive (multiple LLM calls)
-
----
-
-## What We Measure
-
-Given a query like "incident reporting requirements in NJ", both systems must return:
-
-```json
-{
-  "obligation": "Report cyber incidents to NJCCIC",
-  "deadline": "6 hours",
-  "notify_who": "Reliability and Security Division",
-  "citations": [{"doc_id": "NJ_NJ_3-18-16-6A", "quote": "..."}]
-}
-```
-
-We have 40 test cases with known correct answers (28 positive cases where an obligation exists, 12 negative cases where no obligation should be found). We measure:
-
-| Metric | What It Tells You |
-|--------|-------------------|
-| **Critical Miss Rate** | How often the system fails to find an obligation that exists |
-| **Negative Test Accuracy** | How often the system correctly returns nothing when nothing exists |
-| **Deadline Accuracy** | How often the extracted deadline matches the gold standard |
-| **Notify Who Accuracy** | How often the extracted recipient matches the gold standard |
-| **Cost** | Tokens used, LLM calls, estimated USD |
-
----
-
-## Why the Comparison Is Fair
-
-Both systems use:
-- The same LLM (GPT-4o)
-- The same extraction prompt (verified by hash)
-- The same output schema
-- The same temperature (0, for deterministic output)
-- The same corpus (17 regulatory documents)
-- The same scoring logic
-
-The **only difference** is how they consume evidence: RAG sees many chunks at once; RLM sees smaller spans iteratively.
-
-### Federal Baseline Policy
-
-For state-specific queries (NJ, MD, etc.), both systems return **both state-specific AND federal baseline obligations**. Federal requirements (NERC CIP, DOE) apply to all regulated utilities regardless of state. This means:
-
-- A query for "incident reporting in NJ" will return NJ-specific rules AND federal NERC/DOE requirements
-- Federal obligations returned for state queries are **not** counted as false positives
-- This matches real-world compliance needs: a NJ utility must comply with both state and federal rules
-
-For details on fairness controls, see [EXPERIMENT_GUIDE.md](EXPERIMENT_GUIDE.md).
-
----
-
-## Quick Start
+| | RAG | Controller-Driven |
+|---|-----|-------------------|
+| **Approach** | Retrieve top-k chunks → 1 LLM call | Discover → search → extract → verify → repair |
+| **Config name** | `rag` | `rlm` |
+| **Cost** | Lower | Higher |
 
 ```bash
-# Install dependencies
+pip install -r requirements.txt
+python run_all_experiments.py
+# → Results in eval/results/comparison_report_*.txt
+```
+
+---
+
+## What This Is
+
+A reproducible A/B comparison isolating **one variable**: evidence consumption strategy.
+
+- **Single-pass RAG:** Retrieve top-k chunks, format as context, one LLM extraction call.
+- **Controller-Driven (RLM-inspired):** Iteratively discover docs → search within each doc → extract per paragraph → verify → repair. Code config name: `rlm`.
+
+**Not included:** The paper's full REPL-based RLM where the LLM writes code to decide retrieval. This repo uses a deterministic controller for reproducibility.
+
+---
+
+## Two Strategies
+
+### RAG (Single-Pass)
+
+Retrieve top-k chunks → format context → one LLM call.
+
+- Hybrid semantic + BM25 retrieval (top-6 after reranking)
+- One LLM call extracts all obligations
+- No post-processing
+- Fast, low cost
+
+### Controller-Driven (Iterative)
+
+Discover docs → search within each → extract per paragraph → verify → repair.
+
+- BM25 discovery of relevant documents (max 2 per state)
+- BM25 search within each doc with query expansion (max 10 paragraphs per state)
+- LLM extraction per paragraph (all obligations, not just first)
+- Verification: drop obligations that don't match query intent
+- Repair: fill missing fields only if substring matches source text
+- Slower, higher cost
+
+See [SYSTEM_ARCHITECTURE.md](SYSTEM_ARCHITECTURE.md) for implementation details.
+
+---
+
+## Reproducibility
+
+Both strategies use identical:
+
+| Control | Value |
+|---------|-------|
+| LLM model | `gpt-4o` (configurable) |
+| Temperature | `0` (minimizes sampling variance) |
+| Extraction prompt | Hash-verified at runtime |
+| Output schema | Same Pydantic models |
+| Corpus | 17 regulatory documents |
+| Scoring | Same evaluator logic |
+
+The **only variable** is evidence consumption strategy.
+
+See [EXPERIMENT_GUIDE.md](EXPERIMENT_GUIDE.md#why-the-comparison-is-fair) for detailed fairness rationale.
+
+---
+
+## Demo
+
+```bash
+# Install
 pip install -r requirements.txt
 
-# (Optional) Re-download the source documents and rebuild the corpus end-to-end
-python build_corpus.py --download
+# Set API key
+$env:OPENAI_API_KEY = "sk-..."  # PowerShell
+# export OPENAI_API_KEY="sk-..."  # Bash
 
-# Run the full experiment suite (2 configurations: rag, rlm)
+# Run both strategies on 40 test queries
 python run_all_experiments.py
 
-# Results appear in eval/results/comparison_report_*.txt
+# Results written to:
+#   eval/results/comparison_report_YYYYMMDD_HHMMSS.txt
+#   eval/results/eval_rag_*.json
+#   eval/results/eval_rlm_*.json
 ```
 
----
-
-## Repository Structure
-
+**One-off debugging:**
+```bash
+python run_rag.py "incident reporting" NJ
+python run_rlm.py "incident reporting" NJ
 ```
-rlm-utilities/
-├── corpus/normalized/     # 17 processed regulatory documents
-├── rag/                   # RAG retrieval components
-├── rlm/                   # RLM controller and tools
-├── eval/                  # Evaluation harness and gold standard
-├── run_all_experiments.py # Runs all configs and generates comparison
-└── requirements.txt
-```
-
-For a detailed walkthrough of every component, see [SYSTEM_ARCHITECTURE.md](SYSTEM_ARCHITECTURE.md).
-
----
-
-## Utility Scripts
-
-These scripts are not part of the evaluation harness, but are useful during development.
-
-- [run_rlm.py](run_rlm.py): Run a single ad-hoc RLM query and save the raw JSON output (good for debugging without running the full eval suite).
-- [run_rag.py](run_rag.py): Run a single ad-hoc RAG query using the same prompt/schema as the experiment baseline.
-- [build_corpus.py](build_corpus.py): Rebuild the `corpus/` directory from `downloads/_download-log.csv` by extracting text/metadata from downloaded source files.
-- [urls.txt](urls.txt): Canonical list of public source URLs used to assemble the corpus.
-- [download_sources.py](download_sources.py): Download `urls.txt` into `downloads/` and regenerate `downloads/_download-log.csv`.
 
 ---
 
@@ -156,33 +107,54 @@ These scripts are not part of the evaluation harness, but are useful during deve
 
 The comparison report shows metrics side-by-side:
 
-```
-Metric                         rag       rlm
-------------------------------------------------------
-Critical Miss Rate            21%       18%
-Negative Test Accuracy        58%       75%
-Deadline Accuracy             32%       45%
-RLM Verified                   --        42
-RLM Dropped by Verifier        --         3
-Cost (USD)                  $0.63     $1.06
-```
+| Metric | What it measures |
+|--------|------------------|
+| **Critical Miss Rate** | % of positive cases where obligation not found (lower = better) |
+| **Negative Test Accuracy** | % of negative cases with no false positives (higher = better) |
+| **Deadline/Notify Accuracy** | Field extraction quality |
+| **Cost** | Tokens and USD |
 
-What this tells you:
-- If RLM has a **lower** critical miss rate at reasonable cost, the iterative approach is worth it
-- If RLM has **higher** negative test accuracy, it hallucinates less
-- **RLM Verified/Dropped** shows how many obligations passed or failed the verification step
-- If the costs are similar, the winner is whichever has better accuracy
+**Controller-Driven wins if:** Lower miss rate at acceptable cost increase.
+
+See [EXPERIMENT_GUIDE.md](EXPERIMENT_GUIDE.md#metrics) for full metric definitions.
 
 ---
 
-## Who This Is For
+## Federal Baseline Policy
 
-- **Researchers** exploring alternatives to single-shot RAG
-- **ML Engineers** evaluating multi-step extraction pipelines
-- **Compliance teams** considering automation for regulatory obligation tracking
+State queries (e.g., "NJ incident reporting") return **both state AND federal** obligations. Federal rules (NERC CIP, DOE) apply to all utilities. Federal obligations are not false positives for state queries.
+
+See [EXPERIMENT_GUIDE.md](EXPERIMENT_GUIDE.md#federal-baseline-policy) for scoring details.
 
 ---
 
-## License
+## Limitations
 
-MIT — see [LICENSE](LICENSE)
+1. **Fixed budgets:** 2 docs, 10 paragraphs per state may not generalize
+2. **Paragraph boundaries:** Can miss obligations split across paragraphs
+3. **Corpus size:** 17 documents, regulatory domain only
+4. **Verification trade-off:** Filters out obligations with unsupported fields (precision over recall)
+
+---
+
+## Repository Structure
+
+```
+├── rag/                    # RAG retriever implementation
+├── rlm/                    # Controller-Driven loop (config: rlm)
+├── eval/                   # Harness, prompts, gold standard (40 queries)
+├── corpus/normalized/      # 17 documents + indexes
+├── run_all_experiments.py  # Main entry point
+└── requirements.txt
+```
+
+---
+
+## Documentation
+
+- **[EXPERIMENT_GUIDE.md](EXPERIMENT_GUIDE.md)** — Running experiments, metrics, scoring
+- **[SYSTEM_ARCHITECTURE.md](SYSTEM_ARCHITECTURE.md)** — Technical implementation details
+
+---
+
+**License:** MIT

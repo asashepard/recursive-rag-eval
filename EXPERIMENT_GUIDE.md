@@ -1,6 +1,8 @@
 # Experiment Guide
 
-How to run and interpret the RAG vs RLM comparison experiment.
+**Authoritative reference for running and scoring the RAG vs. Controller-Driven comparison experiment.**
+
+This document covers metrics, scoring logic, and how to interpret results. For implementation details, see [SYSTEM_ARCHITECTURE.md](SYSTEM_ARCHITECTURE.md).
 
 ---
 
@@ -20,7 +22,7 @@ This runs both configurations in parallel and generates a comparison report in `
 # RAG baseline
 python -m eval.run_eval --experiment rag
 
-# RLM with iterative search
+# Controller-Driven with iterative search
 python -m eval.run_eval --experiment rlm
 ```
 
@@ -42,16 +44,14 @@ Shows which queries would run without executing them.
 
 ## Experiment Configurations
 
-Each configuration isolates a specific variable:
+| Config | Strategy | Evidence Consumption |
+|--------|----------|----------------------|
+| `rag` | Single-pass RAG | Retrieve top-k chunks → 1 LLM call |
+| `rlm` | Controller-Driven | Discover → search → extract → verify → repair |
 
-| Config | Architecture | Question Answered |
-|--------|-------------|-------------------|
-| `rag` | Single-pass | What does standard RAG achieve? |
-| `rlm` | Iterative + Verification | Does iterative multi-doc search with verification improve over RAG? |
+**No Pre-LLM Gating:** Neither strategy uses keyword-based abstain gates. When retrieval returns chunks, the LLM is always called. Negative test behavior relies solely on prompt instructions ("return empty array if no obligations found").
 
-**No Pre-LLM Gating:** Neither RAG nor RLM uses keyword-based abstain gates. When retrieval returns chunks, the LLM is always called. Negative test behavior relies solely on prompt instructions ("return empty array if no obligations found").
-
-**RLM Verification Loop:** After extracting an obligation, RLM runs a verification step that checks:
+**Controller-Driven Verification Loop:** After extracting an obligation, Controller-Driven runs a verification step:
 1. **Activity match** - Does the obligation actually relate to the query activity?
 2. **Deadline present** - Is the deadline field supported by the cited text?
 3. **Notify present** - Is the notify_who field supported by the cited text?
@@ -62,16 +62,29 @@ If activity_match is false, the obligation is dropped. If deadline/notify are mi
 
 ## Federal Baseline Policy
 
-For state-specific queries, the task definition includes returning both state and federal obligations:
+State-specific queries (e.g., "incident reporting in NJ") must return **both state AND federal obligations**.
 
-- **Federal docs (NERC CIP, DOE) are VALID for state queries** - A NJ utility must comply with both NJ rules AND federal NERC/DOE requirements
-- **FED obligations are not false positives** - When scoring state queries, obligations from valid FED docs count as correct (not penalized)
-- **Complete answers include both sources** - The prompt explicitly instructs both systems to return all applicable obligations
+**Rationale:** Federal regulations (NERC CIP, DOE) apply to all utilities regardless of state. A NJ utility must comply with both NJ-specific rules and federal requirements.
 
-This policy is encoded in:
-1. The extraction prompt (`EXTRACTION_USER_TEMPLATE` in [experiment_config.py](eval/experiment_config.py))
-2. The gold standard metadata (`_federal_baseline_policy` in [gold_standard.json](eval/gold_standard.json))
-3. The evaluator scoring logic ([evaluator.py](eval/evaluator.py))
+**Scoring rules:**
+- Federal obligations from valid FED documents count as correct (not penalized)
+- Both state and federal obligations must be returned for complete answers
+- The extraction prompt explicitly instructs both strategies to return all applicable obligations
+
+**Implementation:** Encoded in the extraction prompt ([experiment_config.py](eval/experiment_config.py)), gold standard metadata ([gold_standard.json](eval/gold_standard.json)), and evaluator scoring ([evaluator.py](eval/evaluator.py)).
+
+---
+
+## How Scoring Works
+
+1. **Load gold standard:** 40 queries with known correct answers (28 positive, 12 negative)
+2. **Run strategy:** Execute RAG or Controller-Driven on each query
+3. **Match obligations:** For positive cases, check if returned obligation matches gold (by doc_id + fuzzy text match)
+4. **Score fields:** If obligation found, check deadline and notify_who accuracy
+5. **Categorize errors:** If missed, categorize why (doc not discovered, wrong span, etc.)
+6. **Aggregate:** Compute rates across all queries
+
+Scoring logic: [eval/evaluator.py](eval/evaluator.py)
 
 ---
 
@@ -84,7 +97,7 @@ The experiment controls for everything except the evidence consumption strategy:
 | Factor | How Controlled | Verification |
 |--------|----------------|--------------|
 | **LLM Model** | Defaults to `gpt-4o`; override with `--model` flag | Same model used across all configs in a run |
-| **Temperature** | Hardcoded `0` for determinism | Config file |
+| **Temperature** | Hardcoded `0` (minimizes LLM sampling variance) | Config file |
 | **Extraction Prompt** | Both use `EXTRACTION_SYSTEM_PROMPT` and `EXTRACTION_USER_TEMPLATE` | Hash verified at runtime |
 | **Output Schema** | Both produce `{"obligations": [...]}` per [schemas.py](rag/schemas.py) | Same Pydantic models |
 | **Corpus** | Same 17 documents, same chunking, same indexes | Single corpus directory |
@@ -103,7 +116,7 @@ If the hashes differ, the experiment fails.
 
 ### Budget Caps
 
-RLM has hard limits to prevent "winning by spending more":
+Controller-Driven has hard limits to prevent "winning by spending more":
 
 | Budget | Value | Enforced In |
 |--------|-------|-------------|
@@ -112,9 +125,9 @@ RLM has hard limits to prevent "winning by spending more":
 | Max tool calls per state | 6 | [rlm_controller.py](rlm/rlm_controller.py) |
 | Max global iterations | 12 | [rlm_controller.py](rlm/rlm_controller.py) |
 
-### RLM Retrieval Enhancements
+### Controller-Driven Retrieval Enhancements
 
-RLM uses several techniques to improve paragraph retrieval:
+Controller-Driven uses several techniques to achieve parity with RAG's semantic capabilities:
 
 | Technique | Purpose |
 |-----------|--------|
@@ -126,16 +139,16 @@ RLM uses several techniques to improve paragraph retrieval:
 
 ### Why These Enhancements Are Fair
 
-These RLM improvements achieve **parity** with RAG's inherent advantages, not an unfair edge:
+These enhancements achieve **parity** with RAG's inherent advantages, not an unfair edge:
 
 | Enhancement | Why It's Fair |
 |-------------|---------------|
-| **Query Expansion** | RAG uses hybrid semantic+BM25 retrieval. Semantic embeddings *already* handle synonyms implicitly ("notification" ≈ "report" in embedding space). RLM's BM25-only within-doc search needs explicit expansion to match this capability. |
-| **Contextual Windowing** | RAG uses 900-token overlapping chunks, naturally providing cross-boundary context. RLM's paragraph-level granularity needs explicit windowing to achieve similar context. |
-| **Multi-obligation Extraction** | Both systems use identical extraction prompts that request ALL obligations. This fix ensures RLM's paragraph-by-paragraph approach doesn't artificially limit what RAG's single-pass naturally captures. |
-| **Increased k** | RAG retrieves top-12 from each index (24 candidates), then reranks to 6. RLM's k=25 is comparable candidate volume before filtering. |
+| **Query Expansion** | RAG uses hybrid semantic+BM25 retrieval. Semantic embeddings *already* handle synonyms implicitly ("notification" ≈ "report" in embedding space). Controller-Driven's BM25-only within-doc search needs explicit expansion to match this capability. |
+| **Contextual Windowing** | RAG uses 900-token overlapping chunks, naturally providing cross-boundary context. Controller-Driven's paragraph-level granularity needs explicit windowing to achieve similar context. |
+| **Multi-obligation Extraction** | Both strategies use identical extraction prompts that request ALL obligations. This fix ensures Controller-Driven's paragraph-by-paragraph approach doesn't artificially limit what RAG's single-pass naturally captures. |
+| **Increased k** | RAG retrieves top-12 from each index (24 candidates), then reranks to 6. Controller-Driven's k=25 is comparable candidate volume before filtering. |
 
-The core variable under test—**iterative span consumption vs. single-pass chunk stuffing**—remains isolated.
+The core variable under test—**evidence consumption strategy**—remains isolated.
 
 ---
 
@@ -195,7 +208,7 @@ The `corpus_text` field contains the exact quote from the document, allowing ver
 | **Total Tokens** | Prompt + completion tokens |
 | **Estimated Cost** | USD at current GPT-4o pricing |
 
-### RLM Verification Metrics
+### Controller-Driven Verification Metrics
 
 | Metric | Definition |
 |--------|------------|
@@ -227,12 +240,12 @@ Estimated Cost (USD)        $0.63     $1.06
 
 ### What to Look For
 
-**RLM beats RAG if:**
+**Controller-Driven wins if:**
 - Critical miss rate is lower (finds more obligations)
 - At acceptable cost increase
 - Verification drops few legitimate obligations
 
-**RLM worse than RAG if:**
+**Controller-Driven worse than RAG if:**
 - Same or higher critical miss rate
 - At higher cost
 
@@ -284,7 +297,7 @@ echo "OPENAI_API_KEY=sk-..." > .env
 python run_all_experiments.py --model gpt-4o-mini
 ```
 
-**Important:** All configs in a single run use the same model, ensuring fair comparison within that run. However, results from different models are not directly comparable—weaker models may struggle with the iterative RLM approach while performing adequately on single-shot RAG.
+**Important:** All configs in a single run use the same model, ensuring fair comparison within that run. However, results from different models are not directly comparable—weaker models may struggle with the iterative Controller-Driven approach while performing adequately on single-shot RAG.
 
 ### Filtering to specific states
 

@@ -1,28 +1,30 @@
 # System Architecture
 
-Technical reference for the RAG and RLM extraction systems.
+**Technical reference for the RAG and Controller-Driven extraction systems.**
+
+This document covers implementation details, code structure, and component interactions. For running experiments and interpreting results, see [EXPERIMENT_GUIDE.md](EXPERIMENT_GUIDE.md).
+
+> **Terminology:** The README uses "Controller-Driven" to describe the iterative approach. In code and configs, this is `rlm`. Both terms refer to the same system.
 
 ---
 
 ## Overview
 
+**Purpose:** Compare two evidence consumption strategies for regulatory compliance extraction.
+
 Both systems answer queries like *"What are the incident reporting requirements for New Jersey?"* by:
 
-1. Searching a corpus of regulatory documents
+1. Searching a corpus of 17 regulatory documents
 2. Extracting structured obligations using an LLM
 3. Returning JSON with citations
 
-They differ in **how** they search and extract.
+They differ in **how** they consume evidence: single-pass vs. iterative.
 
 ### Federal Baseline Policy
 
-For state-specific queries (e.g., "incident reporting in NJ"), both systems:
+State queries return both state AND federal obligations. Federal rules (NERC CIP, DOE) apply to all utilities.
 
-1. **Search both state AND federal documents** - Federal regulations (NERC CIP, DOE) apply to all utilities
-2. **Return obligations from both sources** - The prompt instructs extraction of all applicable obligations
-3. **Score FED docs as valid** - Federal obligations are not counted as false positives for state queries
-
-This matches real-world compliance: a NJ utility must comply with both state-specific rules AND federal NERC/DOE requirements.
+See [EXPERIMENT_GUIDE.md](EXPERIMENT_GUIDE.md#federal-baseline-policy) for scoring details.
 
 ---
 
@@ -54,10 +56,12 @@ corpus/normalized/
 
 ## RAG System
 
+> Code config name: `rag`
+
 ### Architecture
 
 ```
-Query → Retriever → top-10 chunks → LLM extraction → ActivityResponse
+Query → Retriever → top-6 chunks → LLM extraction → ActivityResponse
 ```
 
 Single-pass: one retrieval, one LLM call.
@@ -117,12 +121,14 @@ class RAGRunner:
 
 ---
 
-## RLM System
+## Controller-Driven System
+
+> Code config name: `rlm`
 
 ### Architecture
 
 ```
-Query → Controller → [search → extract → verify → repair] × N → ActivityResponse
+Query → Controller → [discover → search → extract → verify → repair] × N → ActivityResponse
 ```
 
 Iterative: multiple search and extraction steps per query, with post-extraction verification.
@@ -194,7 +200,7 @@ def _expand_query(self, query):
     return query + " " + " ".join(expansions)
 ```
 
-> **Fairness Note:** RAG's hybrid retrieval uses semantic embeddings, which *implicitly* capture synonym relationships ("notification" ≈ "report" in embedding space). RLM's within-document BM25 search has no semantic layer, so explicit query expansion achieves parity rather than providing an unfair advantage.
+> **Fairness Note:** RAG's hybrid retrieval uses semantic embeddings, which *implicitly* capture synonym relationships ("notification" ≈ "report" in embedding space). Controller-Driven's within-document BM25 search has no semantic layer, so explicit query expansion achieves parity rather than providing an unfair advantage.
 
 #### Contextual Windowing
 
@@ -211,7 +217,7 @@ def _get_context_window(self, span_id):
     return current["text"]
 ```
 
-> **Fairness Note:** RAG uses 900-token overlapping chunks, which naturally provide cross-boundary context. RLM's paragraph-level granularity requires explicit windowing to achieve comparable context coverage.
+> **Fairness Note:** RAG uses 900-token overlapping chunks, which naturally provide cross-boundary context. Controller-Driven's paragraph-level granularity requires explicit windowing to achieve comparable context coverage.
 
 #### Paragraph Extraction
 
@@ -376,7 +382,7 @@ class ActivityResponse(BaseModel):
 
 ### Extraction Prompts ([eval/experiment_config.py](eval/experiment_config.py))
 
-Unified prompts used by both RAG and RLM:
+Unified prompts used by both RAG and Controller-Driven:
 
 ```python
 EXTRACTION_SYSTEM_PROMPT = """You are a regulatory compliance expert...
@@ -538,7 +544,7 @@ def main():
 | [rag/index.py](rag/index.py) | FAISS index loading |
 | [rag/bm25_search.py](rag/bm25_search.py) | BM25 keyword search |
 | [rag/schemas.py](rag/schemas.py) | Output Pydantic models |
-| [rlm/rlm_controller.py](rlm/rlm_controller.py) | Main RLM orchestration |
+| [rlm/rlm_controller.py](rlm/rlm_controller.py) | Controller-Driven orchestration |
 | [rlm/rlm_environment.py](rlm/rlm_environment.py) | Tool implementations |
 | [rlm/paragraph_index.py](rlm/paragraph_index.py) | Paragraph-level indexing |
 | [eval/run_eval.py](eval/run_eval.py) | CLI entry point |
