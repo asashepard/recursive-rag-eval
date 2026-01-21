@@ -27,7 +27,7 @@ A reproducible A/B comparison isolating **one variable**: evidence consumption s
 - **Single-pass RAG:** Retrieve top-k chunks, format as context, one LLM extraction call.
 - **Controller-Driven (RLM-inspired):** Iteratively discover docs → search within each doc → extract per paragraph → verify → repair. Code config name: `rlm`.
 
-**Not included:** The paper's full REPL-based RLM where the LLM writes code to decide retrieval. This repo uses a deterministic controller for reproducibility.
+**Not included:** The original RLM paper’s REPL-based setup where the LLM writes Python to decide retrieval (see [Reference](#reference)). This repo uses a deterministic controller for reproducibility.
 
 ---
 
@@ -154,6 +154,14 @@ See [EXPERIMENT_GUIDE.md](EXPERIMENT_GUIDE.md#federal-baseline-policy) for scori
 
 - **[EXPERIMENT_GUIDE.md](EXPERIMENT_GUIDE.md)** — Running experiments, metrics, scoring
 - **[SYSTEM_ARCHITECTURE.md](SYSTEM_ARCHITECTURE.md)** — Technical implementation details
+
+---
+
+## Reference
+
+This repository is **RLM-inspired** (iterative evidence consumption with tool use), but uses a deterministic controller for reproducibility.
+
+- Alex L. Zhang, Tim Kraska, Omar Khattab. “Recursive Language Models.” arXiv:2512.24601 (2025). https://doi.org/10.48550/arXiv.2512.24601
 
 ---
 
