@@ -1,0 +1,56 @@
+# Source list for this experiment's corpus.
+#
+# Where these came from:
+# - Publicly accessible regulatory documents (state PUC orders/rules, ERCOT market rules,
+#   NERC standards, DOE-417 materials) gathered manually during corpus assembly.
+# - The NARUC index URL is included as a public “directory” reference that helps justify
+#   the particular state set chosen for this controlled experiment.
+#
+# How they were chosen:
+# - One primary-source “anchor” per jurisdiction for incident reporting / cyber reporting
+#   obligations, plus a federal/bulk-power layer (NERC/DOE).
+# - Chosen to be stable, citable URLs and to cover a small but diverse set of jurisdictions.
+#
+# Reproducibility:
+# - Use `python download_sources.py` (or `python build_corpus.py --download`) to re-download
+#   these sources into downloads/ and regenerate downloads/_download-log.csv.
+
+# --- NARUC index (helps justify the state set) ---
+https://pubs.naruc.org/pub/86615D01-1866-DAAC-99FB-02328D2044C3
+
+# --- Federal / bulk-power layer ---
+https://www.nerc.com/globalassets/standards/reliability-standards/cip/cip-008-6.pdf
+https://www.nerc.com/globalassets/standards/reliability-standards/eop/eop-004-4.pdf
+https://doe417.pnnl.gov/instructions
+https://doe417.pnnl.gov/files/DOE-417_Form.pdf
+https://www.nerc.com/globalassets/standards/projects/2018-02/implementation_guidance_for_cip-008-6_final_ballot_01152019.pdf
+https://www.nerc.com/globalassets/who-we-are/legal--regulatory/filings--orders/nerc-filings-to-ferc/2025/2024_cip-008-6_annual_report_digicert.pdf
+
+# --- Georgia ---
+https://www.legis.ga.gov/api/legislation/document/20212022/196159
+
+# --- Maryland ---
+https://www.psc.state.md.us/wp-content/uploads/Order-No.-89015-Case-No.-9492-Cyber-Security-Reporting-of-Maryland-Utilities.pdf
+
+# --- Michigan (electric security reporting is inside this) ---
+https://ars.apps.lara.state.mi.us/AdminCode/DownloadAdminCodeFile?FileName=R+460.3101+to+R+460.3908.pdf
+
+# --- New Hampshire (electric) ---
+https://www.energy.nh.gov/sites/g/files/ehbemt551/files/inline-documents/sonh/physical-cyber-safety-rules-electric.pdf
+
+# --- New Jersey ---
+https://www.nj.gov/bpu/pdf/boardorders/2016/20160318/3-18-16-6A.pdf
+
+# --- Oklahoma (electric utility rules PDF; contains 165:35-33-7 referenced by NARUC) ---
+https://oklahoma.gov/content/dam/ok/en/occ/documents/ajls/jls-courts/rules/2020/current-rules/webreadych35fy2021-10-01-2020-searchable.pdf
+
+# --- Pennsylvania (Chapter 101) ---
+https://www.pacodeandbulletin.gov/secure/pacode/data/052/chapter101/052_0101.pdf
+
+# --- Texas / ERCOT ---
+https://www.ercot.com/mktrules/issues/NPRR928
+https://www.ercot.com/mktrules/issues/NPRR993
+https://www.ercot.com/files/docs/2020/03/13/23O-031320_Nodal.docx
+
+# --- Vermont (Case 7307 order) ---
+https://legislature.vermont.gov/Documents/2026/Workgroups/House%20Energy%20and%20Digital/Cyber%20Security/W~Bill%20Jordan~Final%20Order%20Approving%20a%20Statement%20of%20Principles%20Relative%20to%20Cyber%20Security~5-13-2025.pdf

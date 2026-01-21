@@ -1,0 +1,571 @@
+{
+  "_description": "Gold standard for RLM evaluation - 40 test cases (28 positive, 12 negative)",
+  "_note": "Each obligation has BOTH deadline AND notify_who verified from source corpus text. Includes 12 negative test cases.",
+  "_version": "4.2",
+  "_quality_criteria": "All entries verified against actual corpus text with explicit deadline and notify_who",
+  "_federal_baseline_policy": "Federal docs (NERC CIP, DOE) are VALID for state queries. A NJ utility must comply with both NJ rules AND federal NERC/DOE requirements. Systems may return FED obligations for state queries without penalty.",
+  "_changelog": "v4.2: Clarified federal baseline policy - FED docs valid for state queries. v4.1: Added 10 more negative tests (wrong state, wrong activity, unrelated topics). v4.0: Added 8 new obligations + 2 negative tests. v3.1: Fixed activity types",
+  
+  "queries": [
+    {
+      "id": "NJ_incident_reporting",
+      "activity": "incident reporting",
+      "state": "NJ",
+      "must_catch": {
+        "obligation": "Utilities shall report cyber events relating to ICS through NJCCIC within 6 hours of detection",
+        "deadline": "6 hours after detection",
+        "notify_who": "Reliability and Security Division Staff via NJCCIC",
+        "cite": {
+          "doc_id": "NJ_NJ_3-18-16-6A",
+          "section": "Incident Reporting 3.a.iv",
+          "corpus_text": "Pursuant to N.JAC. 14:3-6.7, reports shall be made within 6 hours of the detection of an incident."
+        }
+      }
+    },
+    {
+      "id": "NJ_annual_certification",
+      "activity": "annual certification",
+      "state": "NJ",
+      "must_catch": {
+        "obligation": "Utilities shall certify on an annual basis compliance with minimum cyber security requirements",
+        "deadline": "December 31 each year",
+        "notify_who": "Reliability and Security Division Staff",
+        "cite": {
+          "doc_id": "NJ_NJ_3-18-16-6A",
+          "section": "Accountability and Board Review 1",
+          "corpus_text": "Such certification must be submitted to Reliability and Security Division Staff no later than December 31 of each year following the implementation period."
+        }
+      }
+    },
+    
+    {
+      "id": "MD_incident_reporting",
+      "activity": "incident reporting",
+      "state": "MD",
+      "must_catch": {
+        "obligation": "Verbally report cyber-security breaches that impact IT, OT, or Smart Grid Systems within one business day",
+        "deadline": "1 business day of confirmation",
+        "notify_who": "Commission's Chief Engineer or designated alternate",
+        "cite": {
+          "doc_id": "MD_PSC_ORDER-NO_-89015-CASE-NO_-9492-CYBER-SECU",
+          "section": "Order (7)",
+          "corpus_text": "shall verbally report cyber-security breaches that impact IT, OT, or Smart Grid Systems to the Commission's Chief Engineer (or designated alternate) within one business day of confirmation"
+        }
+      }
+    },
+    {
+      "id": "MD_breach_notification",
+      "activity": "breach notification",
+      "state": "MD",
+      "must_catch": {
+        "obligation": "Report cyber-security breaches to Chief Engineer and contact DHS NCCIC, Maryland Fusion Center, and Attorney General",
+        "deadline": "1 business day of confirmation",
+        "notify_who": "Chief Engineer, DHS NCCIC, Maryland Fusion Center, MD Attorney General",
+        "cite": {
+          "doc_id": "MD_PSC_ORDER-NO_-89015-CASE-NO_-9492-CYBER-SECU",
+          "section": "Order (7)",
+          "corpus_text": "Breached utilities should also contact the Department of Homeland Security National Cyber-security and Communications Integration Center, and Maryland Fusion Center, as well as the Maryland Attorney General's Office"
+        }
+      }
+    },
+    {
+      "id": "MD_annual_certification",
+      "activity": "annual certification",
+      "state": "MD",
+      "must_catch": {
+        "obligation": "Certification of accuracy of periodic Cyber-security Report by independent firm or authorized company officer",
+        "deadline": "Three-year audit cycle per schedule",
+        "notify_who": "Maryland Public Service Commission",
+        "cite": {
+          "doc_id": "MD_PSC_ORDER-NO_-89015-CASE-NO_-9492-CYBER-SECU",
+          "section": "Order (4) and (6)",
+          "corpus_text": "certification of the accuracy of the periodic Cyber-security Report shall be either by an independent cyber-security consulting firm or by an appropriate and authorized company officer"
+        }
+      }
+    },
+    
+    {
+      "id": "FED_incident_reporting",
+      "activity": "incident reporting",
+      "state": "FED",
+      "must_catch": {
+        "obligation": "Notify E-ISAC and NCCIC of Reportable Cyber Security Incident with functional impact, attack vector, and intrusion level",
+        "deadline": "1 hour after determination of Reportable CSI",
+        "notify_who": "E-ISAC and NCCIC",
+        "cite": {
+          "doc_id": "FED_NERC_CIP-008-6",
+          "section": "R4, Part 4.2",
+          "corpus_text": "One hour after the determination of a Reportable Cyber Security Incident."
+        },
+        "valid_doc_ids": ["FED_NERC_CIP-008-6", "FED_NERC_IMPLEMENTATION_GUIDANCE_FOR_CIP-008-6_FI"]
+      }
+    },
+    {
+      "id": "FED_breach_notification",
+      "activity": "breach notification",
+      "state": "FED",
+      "must_catch": {
+        "obligation": "Initial notification of Reportable Cyber Security Incident within 1 hour including functional impact, attack vector, and intrusion level",
+        "deadline": "1 hour after determination",
+        "notify_who": "E-ISAC and NCCIC",
+        "cite": {
+          "doc_id": "FED_NERC_CIP-008-6",
+          "section": "R4, Part 4.1-4.2",
+          "corpus_text": "Initial notifications and updates shall include the following attributes, at a minimum, to the extent known: The functional impact; The attack vector used; and The level of intrusion"
+        },
+        "valid_doc_ids": ["FED_NERC_CIP-008-6", "FED_NERC_IMPLEMENTATION_GUIDANCE_FOR_CIP-008-6_FI"]
+      }
+    },
+    {
+      "id": "FED_attempt_notification",
+      "activity": "cyber security incident reporting",
+      "state": "FED",
+      "must_catch": {
+        "obligation": "Notify E-ISAC and NCCIC of Cyber Security Incident that was an attempt to compromise",
+        "deadline": "By end of next calendar day after determination",
+        "notify_who": "E-ISAC and NCCIC",
+        "cite": {
+          "doc_id": "FED_NERC_CIP-008-6",
+          "section": "R4, Part 4.2",
+          "corpus_text": "By the end of the next calendar day after determination that a Cyber Security Incident was an attempt to compromise a system"
+        },
+        "valid_doc_ids": ["FED_NERC_CIP-008-6", "FED_DOE417_DOE-417_FORM"]
+      },
+      "_note": "Uses 'cyber security incident reporting' for search. This is a distinct obligation - covers attempted (not successful) compromises with next-day deadline"
+    },
+    {
+      "id": "FED_plan_testing",
+      "activity": "incident response plan testing",
+      "state": "FED",
+      "must_catch": {
+        "obligation": "Test each Cyber Security Incident response plan at least once every 15 calendar months",
+        "deadline": "15 calendar months",
+        "notify_who": "E-ISAC and NCCIC (for actual incidents during testing)",
+        "cite": {
+          "doc_id": "FED_NERC_CIP-008-6",
+          "section": "R2, Part 2.1",
+          "corpus_text": "Test each Cyber Security Incident response plan(s) at least once every 15 calendar months: By responding to an actual Reportable Cyber Security Incident; With a paper drill or tabletop exercise; or With an operational exercise"
+        },
+        "valid_doc_ids": ["FED_NERC_CIP-008-6"]
+      },
+      "_note": "Uses 'incident response plan testing' for search. Testing requirement with 15-month deadline."
+    },
+    
+    {
+      "id": "GA_incident_reporting",
+      "activity": "incident reporting",
+      "state": "GA",
+      "must_catch": {
+        "obligation": "Report cyber attack incident, data breach, or malware on utility computer/network to state director within 2 hours of federal report",
+        "deadline": "2 hours after federal report",
+        "notify_who": "Director of emergency management and homeland security",
+        "cite": {
+          "doc_id": "GA_LEGIS_196159",
+          "section": "38-3-22.2(c)",
+          "corpus_text": "Within two hours of making such report to the United States government or any agency thereof, the utility shall provide substantially the same information to the director of emergency management and homeland security"
+        },
+        "valid_doc_ids": ["GA_LEGIS_196159"]
+      }
+    },
+    {
+      "id": "GA_breach_notification",
+      "activity": "breach notification",
+      "state": "GA",
+      "must_catch": {
+        "obligation": "Utility shall report data breach on utility computer or network to state director within 2 hours of federal report",
+        "deadline": "2 hours after federal report",
+        "notify_who": "Director of emergency management and homeland security or designee",
+        "cite": {
+          "doc_id": "GA_LEGIS_196159",
+          "section": "38-3-22.2(c)",
+          "corpus_text": "Every utility shall report to the director of emergency management and homeland security, or his or her designee, any cyber attack incident, data breach, or identified use of malware on a utility computer or network reported to the United States government"
+        },
+        "valid_doc_ids": ["GA_LEGIS_196159"]
+      },
+      "_note": "Same statute as incident_reporting but specifically covers data breach. The law treats cyber attack, data breach, and malware as equivalent triggers."
+    },
+    
+    {
+      "id": "NH_incident_reporting",
+      "activity": "incident reporting",
+      "state": "NH",
+      "must_catch": {
+        "obligation": "Notify the department by telephone no later than 2 hours after becoming aware of breach of security or threat against facilities",
+        "deadline": "2 hours after becoming aware",
+        "notify_who": "Department of Energy (DOE)",
+        "cite": {
+          "doc_id": "NH_ENERGY_PHYSICAL-CYBER-SAFETY-RULES-ELECTRIC",
+          "section": "En 306.06(f)(3)",
+          "corpus_text": "A utility shall notify the department by telephone as soon as possible, but no later than 2 hours after becoming aware of an accident or event that... Involves a breach of security or threat against the utility's facilities"
+        },
+        "valid_doc_ids": ["NH_ENERGY_PHYSICAL-CYBER-SAFETY-RULES-ELECTRIC"]
+      }
+    },
+    {
+      "id": "NH_breach_notification",
+      "activity": "breach notification",
+      "state": "NH",
+      "must_catch": {
+        "obligation": "Utility shall notify department by telephone within 2 hours of becoming aware of security breach",
+        "deadline": "2 hours after becoming aware",
+        "notify_who": "Department of Energy",
+        "cite": {
+          "doc_id": "NH_ENERGY_PHYSICAL-CYBER-SAFETY-RULES-ELECTRIC",
+          "section": "En 306.06(f)",
+          "corpus_text": "A utility shall notify the department by telephone as soon as possible, but no later than 2 hours after becoming aware of an accident or event that... Involves a breach of security"
+        },
+        "valid_doc_ids": ["NH_ENERGY_PHYSICAL-CYBER-SAFETY-RULES-ELECTRIC"]
+      }
+    },
+    {
+      "id": "NH_annual_plan_submission",
+      "activity": "security plan submission",
+      "state": "NH",
+      "must_catch": {
+        "obligation": "Submit to the department annually one electronic copy of physical security plan and cyber security plan",
+        "deadline": "Annually",
+        "notify_who": "Department of Energy",
+        "cite": {
+          "doc_id": "NH_ENERGY_PHYSICAL-CYBER-SAFETY-RULES-ELECTRIC",
+          "section": "En 306.10(e)",
+          "corpus_text": "Each utility shall submit to the department annually one electronic copy of each of its physical security plan and cyber security plan"
+        },
+        "valid_doc_ids": ["NH_ENERGY_PHYSICAL-CYBER-SAFETY-RULES-ELECTRIC"]
+      },
+      "_note": "Uses 'security plan submission' for search. Annual submission of security plans."
+    },
+    {
+      "id": "NH_quarterly_breach_report",
+      "activity": "breach notification",
+      "state": "NH",
+      "must_catch": {
+        "obligation": "File quarterly report of equipment theft, sabotage and breaches of security on Form E-37",
+        "deadline": "15th day of month following each quarter",
+        "notify_who": "Department of Energy",
+        "cite": {
+          "doc_id": "NH_ENERGY_PHYSICAL-CYBER-SAFETY-RULES-ELECTRIC",
+          "section": "En 306.10(f) and En 308.11",
+          "corpus_text": "On the 15th day of the month following the last day of each quarter, each utility shall file Form E-37 'Quarterly Report of Equipment Theft, Sabotage and Breaches of Security'"
+        },
+        "valid_doc_ids": ["NH_ENERGY_PHYSICAL-CYBER-SAFETY-RULES-ELECTRIC"]
+      }
+    },
+    
+    {
+      "id": "OK_incident_reporting",
+      "activity": "incident reporting",
+      "state": "OK",
+      "must_catch": {
+        "obligation": "Report cybersecurity or infrastructure security events that affect customers immediately to PUD Director",
+        "deadline": "Immediately",
+        "notify_who": "PUD Director or designee",
+        "cite": {
+          "doc_id": "OK_OKLAHOMA_WEBREADYCH35FY2021-10-01-2020-SEARCHABLE",
+          "section": "165:35-33-7(c)",
+          "corpus_text": "The utility is required to report cybersecurity or infrastructure security events that affect customers immediately to the PUD Director or designee."
+        },
+        "valid_doc_ids": ["OK_OKLAHOMA_WEBREADYCH35FY2021-10-01-2020-SEARCHABLE"]
+      }
+    },
+    {
+      "id": "OK_breach_notification",
+      "activity": "breach notification",
+      "state": "OK",
+      "must_catch": {
+        "obligation": "Report cybersecurity events that affect customers immediately to PUD Director or designee",
+        "deadline": "Immediately",
+        "notify_who": "PUD Director or designee",
+        "cite": {
+          "doc_id": "OK_OKLAHOMA_WEBREADYCH35FY2021-10-01-2020-SEARCHABLE",
+          "section": "165:35-33-7(c)",
+          "corpus_text": "The utility is required to report cybersecurity or infrastructure security events that affect customers immediately to the PUD Director or designee."
+        },
+        "valid_doc_ids": ["OK_OKLAHOMA_WEBREADYCH35FY2021-10-01-2020-SEARCHABLE"]
+      }
+    },
+    {
+      "id": "OK_annual_certification",
+      "activity": "annual certification",
+      "state": "OK",
+      "must_catch": {
+        "obligation": "Submit Certification Letter to PUD Director certifying Plan status",
+        "deadline": "March 1 annually",
+        "notify_who": "PUD Director",
+        "cite": {
+          "doc_id": "OK_OKLAHOMA_WEBREADYCH35FY2021-10-01-2020-SEARCHABLE",
+          "section": "165:35-33-7(g)",
+          "corpus_text": "Beginning August 1, 2005 and by March 1 of every year thereafter, and/or when a change is made, each utility shall submit a Certification Letter to the PUD Director"
+        },
+        "valid_doc_ids": ["OK_OKLAHOMA_WEBREADYCH35FY2021-10-01-2020-SEARCHABLE"]
+      }
+    },
+    {
+      "id": "OK_plan_update",
+      "activity": "annual certification",
+      "state": "OK",
+      "must_catch": {
+        "obligation": "Prepare a Plan Update Report by March 1 of each year following same format with redlines",
+        "deadline": "March 1 annually",
+        "notify_who": "PUD Director (kept on site for inspection)",
+        "cite": {
+          "doc_id": "OK_OKLAHOMA_WEBREADYCH35FY2021-10-01-2020-SEARCHABLE",
+          "section": "165:35-33-7(a)",
+          "corpus_text": "each utility shall prepare a Plan Update Report by March 1 of each succeeding year, following the same format as the initial Plan with redlines of all new changes"
+        },
+        "valid_doc_ids": ["OK_OKLAHOMA_WEBREADYCH35FY2021-10-01-2020-SEARCHABLE"]
+      }
+    },
+    
+    {
+      "id": "PA_annual_certification",
+      "activity": "annual certification",
+      "state": "PA",
+      "must_catch": {
+        "obligation": "File Self Certification Form documenting compliance with security planning requirements",
+        "deadline": "At time of Annual Financial Report filing",
+        "notify_who": "Commission at Docket No. M-00031717",
+        "cite": {
+          "doc_id": "PA_PACODEANDBULLETIN_052_0101",
+          "section": "52 Pa. Code § 101.4(a)",
+          "corpus_text": "A utility... shall file the Self Certification Form at the time each Annual Financial Report is filed, under separate cover at Docket No. M-00031717"
+        },
+        "valid_doc_ids": ["PA_PACODEANDBULLETIN_052_0101"]
+      }
+    },
+    
+    {
+      "id": "FED_event_reporting",
+      "activity": "event reporting",
+      "state": "FED",
+      "must_catch": {
+        "obligation": "Report events specified in EOP-004-4 Attachment 1 to entities per event reporting Operating Plan",
+        "deadline": "24 hours of recognition or end of next business day (4 p.m. local)",
+        "notify_who": "Electric Reliability Organization and other organizations per Operating Plan",
+        "cite": {
+          "doc_id": "FED_NERC_EOP-004-4",
+          "section": "R2",
+          "corpus_text": "Each Responsible Entity shall report events specified in EOP-004-4 Attachment 1 to the entities specified per their event reporting Operating Plan by the later of 24 hours of recognition of meeting an event type threshold for reporting or by the end of the Responsible Entity's next business day"
+        },
+        "valid_doc_ids": ["FED_NERC_EOP-004-4", "FED_DOE417_DOE-417_FORM"]
+      }
+    },
+    {
+      "id": "FED_event_reporting_plan",
+      "activity": "event reporting",
+      "state": "FED",
+      "must_catch": {
+        "obligation": "Have an event reporting Operating Plan in accordance with EOP-004-4 Attachment 1",
+        "deadline": "Ongoing (must maintain current plan)",
+        "notify_who": "Electric Reliability Organization, Regional Entity, Reliability Coordinator, law enforcement, governmental authority",
+        "cite": {
+          "doc_id": "FED_NERC_EOP-004-4",
+          "section": "R1",
+          "corpus_text": "Each Responsible Entity shall have an event reporting Operating Plan in accordance with EOP-004-4 Attachment 1 that includes the protocol(s) for reporting to the Electric Reliability Organization and other organizations"
+        },
+        "valid_doc_ids": ["FED_NERC_EOP-004-4"]
+      }
+    },
+    
+    {
+      "id": "MI_annual_cybersecurity_report",
+      "activity": "annual certification",
+      "state": "MI",
+      "must_catch": {
+        "obligation": "Provide annual report to designated commission staff regarding cybersecurity program and risk planning",
+        "deadline": "Annually",
+        "notify_who": "Designated members of the commission staff",
+        "cite": {
+          "doc_id": "MI_ARS_R_460_3101_TO_R_460_3908",
+          "section": "R 460.3205(1)(a)",
+          "corpus_text": "Provide a written or oral annual report, individually or jointly with other electric utilities or cooperatives, to designated members of the commission staff regarding the electric utility's or cooperative's cybersecurity program and related risk planning"
+        },
+        "valid_doc_ids": ["MI_ARS_R_460_3101_TO_R_460_3908"]
+      }
+    },
+    {
+      "id": "MI_incident_reporting",
+      "activity": "incident reporting",
+      "state": "MI",
+      "must_catch": {
+        "obligation": "Orally report confirmation of a cybersecurity incident before public notification",
+        "deadline": "As soon as reasonably practicable and before public notification",
+        "notify_who": "Designated member of the commission staff and Michigan Intelligence Operations Center",
+        "cite": {
+          "doc_id": "MI_ARS_R_460_3101_TO_R_460_3908",
+          "section": "R 460.3205(2)",
+          "corpus_text": "As soon as reasonably practicable and before public notification, an electric utility or cooperative must orally report the confirmation of a cybersecurity incident to a designated member of the commission staff and to the Michigan intelligence operations center"
+        },
+        "valid_doc_ids": ["MI_ARS_R_460_3101_TO_R_460_3908"]
+      }
+    },
+    {
+      "id": "MI_tree_trimming_notification",
+      "activity": "vegetation management",
+      "state": "MI",
+      "must_catch": {
+        "obligation": "Provide customer and property owner notifications before planned maintenance tree trimming",
+        "deadline": "Not less than 3 days and no more than 90 days before",
+        "notify_who": "Customer, property owner, and local government officials within target area",
+        "cite": {
+          "doc_id": "MI_ARS_R_460_3101_TO_R_460_3908",
+          "section": "R 460.3505(d)",
+          "corpus_text": "Provide customer and property owner notifications not less than 3 days and no more than 90 days before planned maintenance tree trimming"
+        },
+        "valid_doc_ids": ["MI_ARS_R_460_3101_TO_R_460_3908"]
+      }
+    },
+    {
+      "id": "MI_major_interruption",
+      "activity": "incident reporting",
+      "state": "MI",
+      "must_catch": {
+        "obligation": "Notify the commission of any major interruption of service to customers",
+        "deadline": "Promptly",
+        "notify_who": "Commission",
+        "cite": {
+          "doc_id": "MI_ARS_R_460_3101_TO_R_460_3908",
+          "section": "R 460.3705(4)",
+          "corpus_text": "An electric utility or cooperative shall promptly notify the commission of any major interruption of service to its customers"
+        },
+        "valid_doc_ids": ["MI_ARS_R_460_3101_TO_R_460_3908"]
+      }
+    },
+    {
+      "id": "MI_accident_reporting",
+      "activity": "incident reporting",
+      "state": "MI",
+      "must_catch": {
+        "obligation": "Notify the commission of fatalities and serious injuries related to facilities or operations",
+        "deadline": "Promptly",
+        "notify_who": "Commission",
+        "cite": {
+          "doc_id": "MI_ARS_R_460_3101_TO_R_460_3908",
+          "section": "R 460.3804",
+          "corpus_text": "An electric utility or cooperative shall promptly notify the commission of fatalities and serious injuries that are substantially related to the facilities or operations of the facilities"
+        },
+        "valid_doc_ids": ["MI_ARS_R_460_3101_TO_R_460_3908"]
+      }
+    },
+    
+    {
+      "id": "TX_cybersecurity_incident",
+      "activity": "incident reporting",
+      "state": "TX",
+      "must_catch": {
+        "obligation": "Notify ERCOT of a malicious or suspicious act that compromises or disrupts a computer network or system",
+        "deadline": "Upon occurrence (no specific time limit stated)",
+        "notify_who": "ERCOT via Notice of Cybersecurity Incident form to NCSI@ercot.com",
+        "cite": {
+          "doc_id": "TX_ERCOT_NPRR928",
+          "section": "Background",
+          "corpus_text": "a Market Participant must notify ERCOT of a malicious or suspicious act that compromises or disrupts a computer network or system, which could jeopardize the reliability or integrity of the ERCOT System"
+        },
+        "valid_doc_ids": ["TX_ERCOT_NPRR928", "TX_ERCOT_23O-031320_NODAL"]
+      }
+    },
+    
+    {
+      "_comment": "=== NEGATIVE TESTS (12 total) ===",
+      "id": "VT_incident_reporting",
+      "activity": "incident reporting",
+      "state": "VT",
+      "must_catch": null,
+      "expected_result": "no_obligation",
+      "_note": "NEGATIVE: VT document contains only principles/guidelines, no mandatory reporting requirement with deadline"
+    },
+    {
+      "id": "TX_annual_certification",
+      "activity": "annual certification",
+      "state": "TX",
+      "must_catch": null,
+      "expected_result": "no_obligation",
+      "_note": "NEGATIVE: TX ERCOT NPRR928 has cybersecurity notification but no annual certification requirement"
+    },
+    
+    {
+      "_comment": "--- Wrong State (state not in corpus) ---",
+      "id": "CA_incident_reporting",
+      "activity": "incident reporting",
+      "state": "CA",
+      "must_catch": null,
+      "expected_result": "no_obligation",
+      "_note": "NEGATIVE: California is not in the corpus - no CA documents exist"
+    },
+    {
+      "id": "FL_breach_notification",
+      "activity": "breach notification",
+      "state": "FL",
+      "must_catch": null,
+      "expected_result": "no_obligation",
+      "_note": "NEGATIVE: Florida is not in the corpus - no FL documents exist"
+    },
+    {
+      "id": "NY_annual_certification",
+      "activity": "annual certification",
+      "state": "NY",
+      "must_catch": null,
+      "expected_result": "no_obligation",
+      "_note": "NEGATIVE: New York is not in the corpus - no NY documents exist"
+    },
+    {
+      "id": "OH_cybersecurity_reporting",
+      "activity": "incident reporting",
+      "state": "OH",
+      "must_catch": null,
+      "expected_result": "no_obligation",
+      "_note": "NEGATIVE: Ohio is not in the corpus - no OH documents exist"
+    },
+    
+    {
+      "_comment": "=== NEGATIVE TESTS: Wrong Activity (activity not in corpus) ===",
+      "id": "NJ_rate_case_filing",
+      "activity": "rate case filing",
+      "state": "NJ",
+      "must_catch": null,
+      "expected_result": "no_obligation",
+      "_note": "NEGATIVE: NJ has cyber security docs but no rate case filing requirements"
+    },
+    {
+      "id": "MD_customer_billing",
+      "activity": "customer billing requirements",
+      "state": "MD",
+      "must_catch": null,
+      "expected_result": "no_obligation",
+      "_note": "NEGATIVE: MD has cyber order but no customer billing requirements"
+    },
+    {
+      "id": "FED_interconnection_queue",
+      "activity": "interconnection queue management",
+      "state": "FED",
+      "must_catch": null,
+      "expected_result": "no_obligation",
+      "_note": "NEGATIVE: FED has NERC CIP cyber docs but no interconnection queue requirements"
+    },
+    {
+      "id": "PA_tariff_modification",
+      "activity": "tariff modification notice",
+      "state": "PA",
+      "must_catch": null,
+      "expected_result": "no_obligation",
+      "_note": "NEGATIVE: PA has cyber self-certification but no tariff modification requirements"
+    },
+    
+    {
+      "_comment": "=== NEGATIVE TESTS: Completely Unrelated Topics ===",
+      "id": "TX_customer_bill_explanation",
+      "activity": "customer bill increase explanation",
+      "state": "TX",
+      "must_catch": null,
+      "expected_result": "no_obligation",
+      "_note": "NEGATIVE: Completely unrelated to cyber security corpus - should find nothing"
+    },
+    {
+      "id": "GA_service_disconnection",
+      "activity": "service disconnection notice",
+      "state": "GA",
+      "must_catch": null,
+      "expected_result": "no_obligation",
+      "_note": "NEGATIVE: GA has breach notification but no service disconnection requirements"
+    }
+  ]
+}

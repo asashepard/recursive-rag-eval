@@ -1,0 +1,21 @@
+# Core ML/AI packages
+sentence-transformers>=2.2.0    # Embeddings (BAAI/bge-large-en-v1.5, cross-encoder)
+faiss-cpu>=1.7.4                # Vector search - imports as 'faiss', PyPI is 'faiss-cpu'
+openai>=1.0.0                   # OpenAI API client
+tiktoken>=0.5.0                 # OpenAI tokenizer
+
+# Environment
+python-dotenv>=1.0.0            # Load .env files - imports as 'dotenv'
+
+# Data/Schema validation
+pydantic>=2.0.0                 # Data validation and schemas
+numpy>=1.24.0                   # Numerical operations
+
+# Text search
+rank-bm25>=0.2.2                # BM25 keyword search
+
+# Document processing
+PyMuPDF>=1.23.0                 # PDF parsing - imports as 'fitz'
+beautifulsoup4>=4.12.0          # HTML parsing - imports as 'bs4'
+python-docx>=1.0.0              # DOCX parsing - imports as 'docx'
+chardet>=5.0.0                  # Character encoding detection

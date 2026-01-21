@@ -1,0 +1,39 @@
+# Environment
+.env
+.venv/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Evaluation results (generated outputs - do not commit)
+/eval/results/
+/eval/_archive/
+/output/
+
+# Downloaded source documents (large, regenerable)
+/downloads/
+
+# Corpus (regenerable from downloads)
+/corpus/
+
+# Logs
+*.log
+log_*.txt
+
+# OS
+.DS_Store
+Thumbs.db
