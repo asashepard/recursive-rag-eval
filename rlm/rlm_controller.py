@@ -412,28 +412,66 @@ class RLMController:
     
     def _expand_query(self, activity: str) -> list[str]:
         """
-        Expand activity query with synonyms for better BM25 recall.
-        Returns a list of query variants to try.
+        Use LLM to generate domain-aware query variants for BM25 search.
+        
+        This replaces brittle hardcoded synonym dictionaries with intelligent
+        expansion that understands regulatory/legal terminology.
+        
+        Returns a list of query variants to try (original + expansions).
         """
         queries = [activity]
         
-        # Common synonym expansions for regulatory search
-        expansions = {
-            "notification": ["report", "reporting", "notice", "notify"],
-            "reporting": ["notification", "report", "notice", "notify"],
-            "incident": ["event", "occurrence", "breach", "attack"],
-            "breach": ["incident", "compromise", "attack", "intrusion"],
-        }
+        # Build prompt for query expansion
+        # Ask for 6 expansions, take top 3 - buffer against temp variability
+        expansion_prompt = f"""Generate 6 alternative search phrases for finding regulatory requirements about: "{activity}"
+
+Requirements:
+- Include synonyms (e.g., "reporting" → "notification", "disclosure")
+- Include legal/regulatory jargon that regulations might use
+- Keep phrases short (2-4 words each)
+- Focus on terms that would appear in utility/energy regulations
+- Order by most likely to appear in regulations first
+
+Return ONLY a JSON object with an "expansions" array of strings.
+Example: {{"expansions": ["event notification", "breach disclosure", "incident notice", "cyber event report", "security occurrence", "reportable incident"]}}"""
+
+        try:
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[{"role": "user", "content": expansion_prompt}],
+                response_format={"type": "json_object"},
+                temperature=0,  # Deterministic for reproducibility
+                max_tokens=200,  # Room for 6 expansions
+            )
+            
+            # Track token usage
+            if self._cost and response.usage:
+                self._cost.add_llm_call(
+                    prompt_tokens=response.usage.prompt_tokens,
+                    completion_tokens=response.usage.completion_tokens,
+                    call_type="query_expansion",
+                )
+            
+            content = response.choices[0].message.content
+            result = json.loads(content)
+            expansions = result.get("expansions", [])
+            
+            # Add top expansions to queries (dedupe, take first 4 unique)
+            added = 0
+            for exp in expansions:
+                if added >= 4:
+                    break
+                if exp and exp.lower() not in [q.lower() for q in queries]:
+                    queries.append(exp)
+                    added += 1
+            
+            print(f"      [Query Expansion] {activity} → {queries}")
+            
+        except (json.JSONDecodeError, ValueError, KeyError) as e:
+            # Fallback: just use original query
+            print(f"      [Query Expansion] Failed, using original: {activity}")
         
-        activity_lower = activity.lower()
-        for term, synonyms in expansions.items():
-            if term in activity_lower:
-                for syn in synonyms:
-                    variant = activity_lower.replace(term, syn)
-                    if variant not in queries:
-                        queries.append(variant)
-        
-        return queries[:3]  # Limit to 3 variants to control cost
+        return queries[:5]  # Original + up to 4 expansions
     
     def _extract_from_document(
         self,
@@ -791,9 +829,9 @@ class RLMController:
                 ],
                 "response_format": {"type": "json_object"},
             }
-            # Only set temperature if model supports it
+            # Temperature 0 for deterministic extraction (matches RAG for fairness)
             if "nano" not in self.model.lower():
-                api_params["temperature"] = 0.1
+                api_params["temperature"] = 0
             
             response = self.client.chat.completions.create(**api_params)
             

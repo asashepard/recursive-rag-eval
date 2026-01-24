@@ -2,10 +2,11 @@
 """
 run_all_experiments.py
 ----------------------
-Run all experiment configurations IN PARALLEL and generate a comparison report.
+Run all experiment configurations SEQUENTIALLY and generate a comparison report.
 
 Usage:
     python run_all_experiments.py
+    python run_all_experiments.py --model gpt-4o-mini  # Use different model
     python run_all_experiments.py --skip-run  # Just generate report from existing results
 
 Note: Run with the venv Python: .\.venv\Scripts\python.exe run_all_experiments.py
@@ -14,10 +15,8 @@ Note: Run with the venv Python: .\.venv\Scripts\python.exe run_all_experiments.p
 import json
 import subprocess
 import sys
-import time
 from datetime import datetime
 from pathlib import Path
-from concurrent.futures import ProcessPoolExecutor, as_completed
 
 EXPERIMENTS = ["rag", "rlm"]
 RESULTS_DIR = Path("eval/results")
@@ -33,115 +32,10 @@ def get_python_executable():
     return sys.executable
 
 
-def run_single_experiment(exp: str, model: str = None) -> tuple[str, int, float]:
-    """Run a single experiment. Returns (exp_name, return_code, elapsed_seconds)."""
-    python_exe = get_python_executable()
-    cmd = [python_exe, "-m", "eval.run_eval", "--experiment", exp]
-    if model:
-        cmd.extend(["--model", model])
-    
-    start = time.time()
-    result = subprocess.run(
-        cmd,
-        cwd=Path(__file__).parent,
-        capture_output=True,
-        text=True,
-    )
-    elapsed = time.time() - start
-    
-    return exp, result.returncode, elapsed, result.stdout, result.stderr
-
-
-def run_experiments_parallel(model: str = None):
-    """Run all experiments in parallel."""
+def run_experiments(model: str = None):
+    """Run all experiments sequentially (RAG first, then RLM)."""
     print("=" * 70)
-    print("RUNNING ALL EXPERIMENTS IN PARALLEL")
-    print("=" * 70)
-    
-    python_exe = get_python_executable()
-    print(f"Using Python: {python_exe}")
-    if model:
-        print(f"Model: {model}")
-    print(f"Launching {len(EXPERIMENTS)} experiments simultaneously...")
-    print()
-    
-    # Launch all experiments in parallel
-    start_time = time.time()
-    processes = {}
-    
-    for exp in EXPERIMENTS:
-        cmd = [python_exe, "-m", "eval.run_eval", "--experiment", exp]
-        if model:
-            cmd.extend(["--model", model])
-        
-        # Start process without capturing output (let it go to separate log files)
-        log_file = RESULTS_DIR / f"log_{exp}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
-        log_handle = open(log_file, "w")
-        
-        proc = subprocess.Popen(
-            cmd,
-            cwd=Path(__file__).parent,
-            stdout=log_handle,
-            stderr=subprocess.STDOUT,
-        )
-        processes[exp] = {"proc": proc, "log_file": log_file, "log_handle": log_handle, "start": time.time()}
-        print(f"  [OK] Started: {exp} (PID {proc.pid}) -> {log_file.name}")
-    
-    print()
-    print("=" * 70)
-    print("WAITING FOR ALL EXPERIMENTS TO COMPLETE...")
-    print("=" * 70)
-    print()
-    
-    # Poll until all complete, showing status updates
-    completed = set()
-    while len(completed) < len(EXPERIMENTS):
-        time.sleep(10)  # Check every 10 seconds
-        
-        for exp, info in processes.items():
-            if exp in completed:
-                continue
-            
-            ret = info["proc"].poll()
-            if ret is not None:
-                # Process completed
-                elapsed = time.time() - info["start"]
-                info["log_handle"].close()
-                completed.add(exp)
-                
-                status = "[OK]" if ret == 0 else "[FAIL]"
-                print(f"  {status} {exp} completed (code={ret}, {elapsed:.1f}s)")
-        
-        # Show progress
-        running = [e for e in EXPERIMENTS if e not in completed]
-        if running:
-            elapsed_total = time.time() - start_time
-            print(f"    ... {len(completed)}/{len(EXPERIMENTS)} done, {len(running)} running ({elapsed_total:.0f}s elapsed)")
-    
-    total_time = time.time() - start_time
-    print()
-    print("=" * 70)
-    print(f"ALL EXPERIMENTS COMPLETED in {total_time:.1f}s ({total_time/60:.1f} min)")
-    print("=" * 70)
-    
-    # Report any failures
-    failures = []
-    for exp, info in processes.items():
-        if info["proc"].returncode != 0:
-            failures.append((exp, info["proc"].returncode, info["log_file"]))
-    
-    if failures:
-        print("\nFAILURES:")
-        for exp, code, log in failures:
-            print(f"  [FAIL] {exp}: exit code {code}, see {log}")
-    
-    return len(failures) == 0
-
-
-def run_experiments_sequential(model: str = None):
-    """Run all experiments one after another (legacy mode)."""
-    print("=" * 70)
-    print("RUNNING ALL EXPERIMENTS (SEQUENTIAL)")
+    print("RUNNING ALL EXPERIMENTS (SEQUENTIAL: RAG → RLM)")
     print("=" * 70)
     
     python_exe = get_python_executable()
@@ -158,6 +52,7 @@ def run_experiments_sequential(model: str = None):
         if model:
             cmd.extend(["--model", model])
         
+        # Run with output going directly to terminal (not captured)
         result = subprocess.run(
             cmd,
             cwd=Path(__file__).parent,
@@ -728,14 +623,10 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--skip-run", action="store_true", help="Skip running experiments, just generate report")
     parser.add_argument("--model", type=str, default=None, help="Model to use (default: gpt-4o). Options: gpt-4o, gpt-4o-mini, etc.")
-    parser.add_argument("--sequential", action="store_true", help="Run experiments sequentially instead of in parallel")
     args = parser.parse_args()
     
     if not args.skip_run:
-        if args.sequential:
-            run_experiments_sequential(model=args.model)
-        else:
-            run_experiments_parallel(model=args.model)
+        run_experiments(model=args.model)
     
     # Find and load results
     result_files = find_latest_results()

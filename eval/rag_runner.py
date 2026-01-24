@@ -122,7 +122,11 @@ class RAGRunner:
         # Step 1: Retrieve relevant chunks
         query_text = f"{activity} requirements for {state}"
         
-        # Use state filter for state-specific queries
+        # -----------------------------------------------------------------------
+        # FAIRNESS FIX: Always include federal documents for state queries.
+        # Federal rules (NERC CIP, DOE) apply to all utilities regardless of state.
+        # This matches RLM behavior which always adds FED to target_states.
+        # -----------------------------------------------------------------------
         if state == "FED":
             results = self.retriever.retrieve(
                 query_text,
@@ -130,11 +134,23 @@ class RAGRunner:
                 include_federal=True,
             )
         else:
-            results = self.retriever.retrieve(
+            # Retrieve state-specific documents
+            state_results = self.retriever.retrieve(
                 query_text,
                 states=[state],
-                include_federal=False,  # Don't mix federal in state results
+                include_federal=False,
             )
+            
+            # Also retrieve federal documents (baseline applies to all states)
+            fed_query = f"{activity} requirements federal"
+            fed_results = self.retriever.retrieve(
+                fed_query,
+                states=["FED"],
+                include_federal=True,
+            )
+            
+            # Merge and dedupe (state results first, then federal)
+            results = self._merge_results(state_results, fed_results)
         
         cost.add_retrieval()
         
@@ -219,3 +235,38 @@ class RAGRunner:
                 confidence="low",
                 not_found_explanation=f"Error: {str(e)}",
             )
+
+    def _merge_results(
+        self,
+        state_results: list[tuple],
+        fed_results: list[tuple],
+    ) -> list[tuple]:
+        """
+        Merge state and federal retrieval results, deduplicating by chunk_id.
+        State results are prioritized (appear first).
+        
+        Args:
+            state_results: List of (Chunk, score) tuples from state query
+            fed_results: List of (Chunk, score) tuples from federal query
+            
+        Returns:
+            Merged list with duplicates removed
+        """
+        seen_ids = set()
+        merged = []
+        
+        # Add state results first (higher priority)
+        for chunk, score in state_results:
+            chunk_id = getattr(chunk, 'chunk_id', None) or id(chunk)
+            if chunk_id not in seen_ids:
+                seen_ids.add(chunk_id)
+                merged.append((chunk, score))
+        
+        # Add federal results (lower priority, dedupe)
+        for chunk, score in fed_results:
+            chunk_id = getattr(chunk, 'chunk_id', None) or id(chunk)
+            if chunk_id not in seen_ids:
+                seen_ids.add(chunk_id)
+                merged.append((chunk, score))
+        
+        return merged

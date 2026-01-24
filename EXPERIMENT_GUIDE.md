@@ -131,7 +131,7 @@ Controller-Driven uses several techniques to achieve parity with RAG's semantic 
 
 | Technique | Purpose |
 |-----------|--------|
-| **Query Expansion** | Adds synonyms (notification ↔ report, incident ↔ breach) to catch term mismatches |
+| **LLM Query Expansion** | Uses GPT-4o to generate domain-aware synonyms and legal jargon (e.g., "incident reporting" → "breach disclosure", "reportable occurrence") |
 | **Contextual Windowing** | Includes preceding paragraph to catch obligations split across boundaries |
 | **Full-text Filtering** | Checks entire paragraph for obligation language, not just the preview |
 | **Multi-obligation Extraction** | Extracts ALL obligations from a paragraph, not just the first match |
@@ -143,12 +143,64 @@ These enhancements achieve **parity** with RAG's inherent advantages, not an unf
 
 | Enhancement | Why It's Fair |
 |-------------|---------------|
-| **Query Expansion** | RAG uses hybrid semantic+BM25 retrieval. Semantic embeddings *already* handle synonyms implicitly ("notification" ≈ "report" in embedding space). Controller-Driven's BM25-only within-doc search needs explicit expansion to match this capability. |
+| **LLM Query Expansion** | RAG uses hybrid semantic+BM25 retrieval. Semantic embeddings *already* handle synonyms implicitly ("notification" ≈ "report" in embedding space). Controller-Driven's BM25-only within-doc search needs explicit expansion to match this capability. The LLM can also generate domain-specific jargon (e.g., "Reportable Cyber Security Incident") that embeddings may miss. |
 | **Contextual Windowing** | RAG uses 900-token overlapping chunks, naturally providing cross-boundary context. Controller-Driven's paragraph-level granularity needs explicit windowing to achieve similar context. |
 | **Multi-obligation Extraction** | Both strategies use identical extraction prompts that request ALL obligations. This fix ensures Controller-Driven's paragraph-by-paragraph approach doesn't artificially limit what RAG's single-pass naturally captures. |
 | **Increased k** | RAG retrieves top-12 from each index (24 candidates), then reranks to 6. Controller-Driven's k=25 is comparable candidate volume before filtering. |
 
 The core variable under test—**evidence consumption strategy**—remains isolated.
+
+---
+
+## Known Asymmetries (By Design)
+
+The following differences between RAG and Controller-Driven are **intentional architectural choices**, not fairness bugs:
+
+### 1. Query Expansion Method
+
+| System | Approach |
+|--------|----------|
+| RAG | Relies on semantic embeddings to handle synonyms implicitly |
+| Controller-Driven | Uses LLM to generate explicit query variants (temp=0, deterministic) |
+
+**Rationale:** Controller-Driven uses BM25 for within-document search, which requires exact keyword matches. LLM expansion compensates for this limitation while potentially discovering domain-specific jargon.
+
+### 2. Pre-Filtering Strategy
+
+| System | Approach |
+|--------|----------|
+| RAG | Sends all retrieved chunks to LLM; relies on prompt to handle non-obligations |
+| Controller-Driven | Filters paragraphs by regex (`shall`, `must`, `required`, etc.) before LLM calls |
+
+**Rationale:** Trade-off between cost and recall. Controller-Driven may miss obligations with unusual phrasing ("utilities are expected to..."), but reduces unnecessary LLM calls.
+
+### 3. Context Window Size
+
+| System | Context per LLM Call |
+|--------|----------------------|
+| RAG | ~5,400-9,000 tokens (6-10 chunks × 900 tokens) |
+| Controller-Driven | ~600 tokens (current + preceding paragraph) |
+
+**Rationale:** Inherent to architecture. RAG sees broad context at once; Controller-Driven sees focused context repeatedly. This affects cross-reference handling—definitions in one section may not be visible when extracting from another.
+
+### 4. Reranking
+
+| System | Approach |
+|--------|----------|
+| RAG | Uses cross-encoder reranking (`ms-marco-MiniLM`) |
+| Controller-Driven | Skips reranking for speed (does multiple searches instead) |
+
+**Rationale:** Controller-Driven compensates with iteration; reranking would slow down the exploration loop.
+
+### Impact on Interpretation
+
+These asymmetries mean the experiment tests the **combined effect** of:
+- Iterative multi-document search
+- Post-extraction verification and repair
+- LLM-based query expansion
+- Paragraph-level context windows
+
+To isolate individual factors, ablation experiments would be needed (e.g., "Controller-Driven without verification").
 
 ---
 

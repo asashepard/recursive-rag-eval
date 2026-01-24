@@ -178,29 +178,35 @@ def _discover_documents(self, activity, state):
     return list(dict.fromkeys([r["doc_id"] for r in results]))
 ```
 
-#### Query Expansion
+#### Query Expansion (LLM-Based)
 
-Before searching, queries are expanded with synonym variants to improve BM25 recall:
+Before searching within documents, queries are expanded using the LLM to generate domain-aware variants:
 
 ```python
-SYNONYM_MAP = {
-    "notification": ["report", "reporting", "notice", "notify"],
-    "report": ["notification", "reporting", "notice", "notify"],
-    "incident": ["event", "occurrence", "breach", "attack"],
-    # ... more synonyms
-}
-
-def _expand_query(self, query):
-    """Add synonym variants to improve BM25 recall."""
-    tokens = query.lower().split()
-    expansions = []
-    for token in tokens:
-        if token in SYNONYM_MAP:
-            expansions.extend(SYNONYM_MAP[token][:3])  # Limit expansion
-    return query + " " + " ".join(expansions)
+def _expand_query(self, activity: str) -> list[str]:
+    """Use LLM to generate domain-aware query variants for BM25 search."""
+    queries = [activity]
+    
+    expansion_prompt = f"""Generate 6 alternative search phrases for: "{activity}"
+    Include synonyms and legal/regulatory jargon...
+    Return JSON: {{"expansions": [...]}}"""
+    
+    response = self.client.chat.completions.create(
+        model=self.model,
+        temperature=0,  # Deterministic for reproducibility
+        ...
+    )
+    
+    # Returns: ["incident reporting", "event notification", "breach disclosure", ...]
+    return queries[:5]  # Original + up to 4 expansions
 ```
 
-> **Fairness Note:** RAG's hybrid retrieval uses semantic embeddings, which *implicitly* capture synonym relationships ("notification" ≈ "report" in embedding space). Controller-Driven's within-document BM25 search has no semantic layer, so explicit query expansion achieves parity rather than providing an unfair advantage.
+**Example expansion for "incident reporting":**
+```json
+{"expansions": ["event notification", "breach disclosure", "cyber incident notice", "security occurrence report", "reportable event", "incident notification"]}
+```
+
+> **Fairness Note:** RAG's hybrid retrieval uses semantic embeddings, which *implicitly* capture synonym relationships ("notification" ≈ "report" in embedding space). Controller-Driven's within-document BM25 search has no semantic layer, so LLM-based expansion achieves parity. The LLM can also generate domain-specific jargon (e.g., "Reportable Cyber Security Incident" from NERC) that frozen embeddings may not capture.
 
 #### Contextual Windowing
 
