@@ -100,7 +100,7 @@ Discover docs → search within each → extract per paragraph → verify → re
 - Repair: fill missing fields only if substring matches source text
 - Slower, higher cost
 
-See [SYSTEM_ARCHITECTURE.md](SYSTEM_ARCHITECTURE.md) for implementation details.
+See [docs/SYSTEM_ARCHITECTURE.md](docs/SYSTEM_ARCHITECTURE.md) for implementation details.
 
 ---
 
@@ -120,7 +120,7 @@ Both strategies use identical:
 
 The **only variable** is evidence consumption strategy.
 
-See [EXPERIMENT_GUIDE.md](EXPERIMENT_GUIDE.md#why-the-comparison-is-fair) for detailed fairness rationale.
+See [docs/EXPERIMENT_GUIDE.md](docs/EXPERIMENT_GUIDE.md#why-the-comparison-is-fair) for detailed fairness rationale.
 
 ---
 
@@ -172,7 +172,7 @@ The comparison report shows metrics side-by-side:
 
 State queries (e.g., "NJ incident reporting") return **both state AND federal** obligations. Federal rules (NERC CIP, DOE) apply to all utilities. Federal obligations are not false positives for state queries.
 
-See [EXPERIMENT_GUIDE.md](EXPERIMENT_GUIDE.md#federal-baseline-policy) for scoring details.
+See [docs/EXPERIMENT_GUIDE.md](docs/EXPERIMENT_GUIDE.md#federal-baseline-policy) for scoring details.
 
 ---
 
@@ -200,8 +200,8 @@ See [EXPERIMENT_GUIDE.md](EXPERIMENT_GUIDE.md#federal-baseline-policy) for scori
 
 ## Documentation
 
-- **[EXPERIMENT_GUIDE.md](EXPERIMENT_GUIDE.md)** — Running experiments, metrics, scoring
-- **[SYSTEM_ARCHITECTURE.md](SYSTEM_ARCHITECTURE.md)** — Technical implementation details
+- **[docs/EXPERIMENT_GUIDE.md](docs/EXPERIMENT_GUIDE.md)** — Running experiments, metrics, scoring
+- **[docs/SYSTEM_ARCHITECTURE.md](docs/SYSTEM_ARCHITECTURE.md)** — Technical implementation details
 
 ---
 

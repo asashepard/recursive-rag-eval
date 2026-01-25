@@ -38,8 +38,8 @@ python -m eval.run_eval --experiment rlm --states NJ MD --activities "incident r
 ### Code Layout Note (Why `eval/rag_runner.py` exists)
 
 - The experiment harness lives under `eval/` and is intended to be run as a module (e.g., `python -m eval.run_eval`).
-- The RAG baseline implementation is therefore in [eval/rag_runner.py](eval/rag_runner.py) so it can be imported by the harness and share the same prompts, schema, and cost tracking.
-- The top-level scripts like [run_rlm.py](run_rlm.py) (and [run_rag.py](run_rag.py)) are ad-hoc utilities for manual debugging and one-off queries; they are not part of the scored harness.
+- The RAG baseline implementation is therefore in [eval/rag_runner.py](../eval/rag_runner.py) so it can be imported by the harness and share the same prompts, schema, and cost tracking.
+- The top-level scripts like [run_rlm.py](../run_rlm.py) (and [run_rag.py](../run_rag.py)) are ad-hoc utilities for manual debugging and one-off queries; they are not part of the scored harness.
 
 ### Dry Run (Preview)
 
@@ -80,7 +80,7 @@ State-specific queries (e.g., "incident reporting in NJ") must return **both sta
 - Both state and federal obligations must be returned for complete answers
 - The extraction prompt explicitly instructs both strategies to return all applicable obligations
 
-**Implementation:** Encoded in the extraction prompt ([experiment_config.py](eval/experiment_config.py)), gold standard metadata ([gold_standard.json](eval/gold_standard.json)), and evaluator scoring ([evaluator.py](eval/evaluator.py)).
+**Implementation:** Encoded in the extraction prompt ([experiment_config.py](../eval/experiment_config.py)), gold standard metadata ([gold_standard.json](../eval/gold_standard.json)), and evaluator scoring ([evaluator.py](../eval/evaluator.py)).
 
 ---
 
@@ -93,7 +93,7 @@ State-specific queries (e.g., "incident reporting in NJ") must return **both sta
 5. **Categorize errors:** If missed, categorize why (doc not discovered, wrong span, etc.)
 6. **Aggregate:** Compute rates across all queries
 
-Scoring logic: [eval/evaluator.py](eval/evaluator.py)
+Scoring logic: [eval/evaluator.py](../eval/evaluator.py)
 
 ---
 
@@ -108,13 +108,13 @@ The experiment controls for everything except the evidence consumption strategy:
 | **LLM Model** | Defaults to `gpt-4o`; override with `--model` flag | Same model used across all configs in a run |
 | **Temperature** | Hardcoded `0` (minimizes LLM sampling variance) | Config file |
 | **Extraction Prompt** | Both use `EXTRACTION_SYSTEM_PROMPT` and `EXTRACTION_USER_TEMPLATE` | Hash verified at runtime |
-| **Output Schema** | Both produce `{"obligations": [...]}` per [schemas.py](rag/schemas.py) | Same Pydantic models |
+| **Output Schema** | Both produce `{"obligations": [...]}` per [schemas.py](../rag/schemas.py) | Same Pydantic models |
 | **Corpus** | Same 17 documents, same chunking, same indexes | Single corpus directory |
-| **Scoring Logic** | Same `Evaluator` class scores all results | [evaluator.py](eval/evaluator.py) |
+| **Scoring Logic** | Same `Evaluator` class scores all results | [evaluator.py](../eval/evaluator.py) |
 
 ### Prompt Hash Verification
 
-At initialization, both RAGRunner and RLMController call `verify_prompt_hash()` in [experiment_config.py](eval/experiment_config.py). This computes a SHA-256 hash of the system prompt and schema, ensuring both systems use identical prompts:
+At initialization, both RAGRunner and RLMController call `verify_prompt_hash()` in [experiment_config.py](../eval/experiment_config.py). This computes a SHA-256 hash of the system prompt and schema, ensuring both systems use identical prompts:
 
 ```
 [RAG] Extraction prompt hash: a1b2c3d4e5f6
@@ -129,10 +129,10 @@ Controller-Driven has hard limits to prevent "winning by spending more":
 
 | Budget | Value | Enforced In |
 |--------|-------|-------------|
-| Max docs per state | 2 | [rlm_controller.py](rlm/rlm_controller.py) |
-| Max spans per state | 10 | [rlm_controller.py](rlm/rlm_controller.py) |
-| Max tool calls per state | 6 | [rlm_controller.py](rlm/rlm_controller.py) |
-| Max global iterations | 12 | [rlm_controller.py](rlm/rlm_controller.py) |
+| Max docs per state | 2 | [rlm_controller.py](../rlm/rlm_controller.py) |
+| Max spans per state | 10 | [rlm_controller.py](../rlm/rlm_controller.py) |
+| Max tool calls per state | 6 | [rlm_controller.py](../rlm/rlm_controller.py) |
+| Max global iterations | 12 | [rlm_controller.py](../rlm/rlm_controller.py) |
 
 ### Controller-Driven Retrieval Enhancements
 
@@ -230,7 +230,7 @@ To isolate individual factors, ablation experiments would be needed (e.g., "Cont
 
 ## Gold Standard
 
-The test set contains 40 queries in [gold_standard.json](eval/gold_standard.json):
+The test set contains 40 queries in [gold_standard.json](../eval/gold_standard.json):
 
 - **28 positive cases:** An obligation exists; we verify the system finds it
 - **12 negative cases:** No obligation exists; we verify the system returns nothing

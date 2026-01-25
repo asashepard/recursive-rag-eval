@@ -43,14 +43,14 @@ corpus/normalized/
 
 ### Document Processing
 
-**Chunking:** Documents are split into ~900-token overlapping chunks by [rag/chunker.py](rag/chunker.py). Each chunk preserves metadata (doc_id, state, page number).
+**Chunking:** Documents are split into ~900-token overlapping chunks by [rag/chunker.py](../rag/chunker.py). Each chunk preserves metadata (doc_id, state, page number).
 
-**Embeddings:** Chunks are embedded using `BAAI/bge-large-en-v1.5` in [rag/embeddings.py](rag/embeddings.py). The model is loaded via `SentenceTransformer`.
+**Embeddings:** Chunks are embedded using `BAAI/bge-large-en-v1.5` in [rag/embeddings.py](../rag/embeddings.py). The model is loaded via `SentenceTransformer`.
 
 **Indexes:**
-- **FAISS:** Built in [rag/index.py](rag/index.py) for fast approximate nearest neighbor search
-- **BM25:** Built in [rag/bm25_search.py](rag/bm25_search.py) using `rank_bm25.BM25Okapi`
-- **Paragraph:** Fine-grained per-document indexes in [rlm/paragraph_index.py](rlm/paragraph_index.py)
+- **FAISS:** Built in [rag/index.py](../rag/index.py) for fast approximate nearest neighbor search
+- **BM25:** Built in [rag/bm25_search.py](../rag/bm25_search.py) using `rank_bm25.BM25Okapi`
+- **Paragraph:** Fine-grained per-document indexes in [rlm/paragraph_index.py](../rlm/paragraph_index.py)
 
 ---
 
@@ -68,7 +68,7 @@ Single-pass: one retrieval, one LLM call.
 
 ### Components
 
-#### Retriever ([rag/retriever.py](rag/retriever.py))
+#### Retriever ([rag/retriever.py](../rag/retriever.py))
 
 Hybrid semantic + lexical retrieval:
 
@@ -90,7 +90,7 @@ Key parameters:
 - `top_k_rerank=6`: Final results after cross-encoder reranking
 - `RERANK_MODEL="cross-encoder/ms-marco-MiniLM-L-6-v2"`
 
-#### RAGRunner ([eval/rag_runner.py](eval/rag_runner.py))
+#### RAGRunner ([eval/rag_runner.py](../eval/rag_runner.py))
 
 Orchestrates retrieval and extraction:
 
@@ -139,7 +139,7 @@ Query → Controller → [discover → search → extract → verify → repair]
 
 Iterative: multiple search and extraction steps per query, with post-extraction verification.
 
-### Controller ([rlm/rlm_controller.py](rlm/rlm_controller.py))
+### Controller ([rlm/rlm_controller.py](../rlm/rlm_controller.py))
 
 The main orchestration loop:
 
@@ -325,7 +325,7 @@ def _verify_and_repair(self, obligation, paragraph_text, cost):
 
 The `_validate_substring` check ensures that any repaired field value actually appears as a substring in the source paragraph, preventing hallucinated repairs.
 
-### Environment ([rlm/rlm_environment.py](rlm/rlm_environment.py))
+### Environment ([rlm/rlm_environment.py](../rlm/rlm_environment.py))
 
 Pure Python tools (no LLM calls) for document exploration:
 
@@ -349,7 +349,7 @@ class RLMEnvironment:
         return self.retriever.retrieve(query, states)
 ```
 
-### Paragraph Index ([rlm/paragraph_index.py](rlm/paragraph_index.py))
+### Paragraph Index ([rlm/paragraph_index.py](../rlm/paragraph_index.py))
 
 Fine-grained indexing at paragraph level:
 
@@ -376,7 +376,7 @@ class GlobalParagraphIndex:
 
 ## Shared Components
 
-### Output Schema ([rag/schemas.py](rag/schemas.py))
+### Output Schema ([rag/schemas.py](../rag/schemas.py))
 
 Both systems produce the same Pydantic models:
 
@@ -400,7 +400,7 @@ class ActivityResponse(BaseModel):
     federal_baseline: Optional[StateObligations]
 ```
 
-### Extraction Prompts ([eval/experiment_config.py](eval/experiment_config.py))
+### Extraction Prompts ([eval/experiment_config.py](../eval/experiment_config.py))
 
 Unified prompts used by both RAG and Controller-Driven:
 
@@ -423,7 +423,7 @@ REGULATORY TEXT:
 Extract all compliance obligations..."""
 ```
 
-### Keywords and Filters ([eval/keywords.py](eval/keywords.py))
+### Keywords and Filters ([eval/keywords.py](../eval/keywords.py))
 
 Regex patterns for filtering and validation:
 
@@ -441,7 +441,7 @@ def is_strong_obligation(text):
 
 ## Evaluation Harness
 
-### Evaluator ([eval/evaluator.py](eval/evaluator.py))
+### Evaluator ([eval/evaluator.py](../eval/evaluator.py))
 
 Scores results against gold standard:
 
@@ -481,7 +481,7 @@ class QueryResult:
     error_category: str  # doc_not_discovered, wrong_span, etc.
 ```
 
-### Cost Tracking ([eval/experiment_config.py](eval/experiment_config.py))
+### Cost Tracking ([eval/experiment_config.py](../eval/experiment_config.py))
 
 ```python
 @dataclass
@@ -559,18 +559,18 @@ def main():
 
 | File | Purpose |
 |------|---------|
-| [rag/retriever.py](rag/retriever.py) | Hybrid semantic+BM25 retrieval |
-| [rag/embeddings.py](rag/embeddings.py) | Vector embedding with BGE-large |
-| [rag/index.py](rag/index.py) | FAISS index loading |
-| [rag/bm25_search.py](rag/bm25_search.py) | BM25 keyword search |
-| [rag/schemas.py](rag/schemas.py) | Output Pydantic models |
-| [rlm/rlm_controller.py](rlm/rlm_controller.py) | Controller-Driven orchestration |
-| [rlm/rlm_environment.py](rlm/rlm_environment.py) | Tool implementations |
-| [rlm/paragraph_index.py](rlm/paragraph_index.py) | Paragraph-level indexing |
-| [eval/run_eval.py](eval/run_eval.py) | CLI entry point |
-| [eval/evaluator.py](eval/evaluator.py) | Scoring logic |
-| [eval/experiment_config.py](eval/experiment_config.py) | Prompts, costs, configs |
-| [eval/rag_runner.py](eval/rag_runner.py) | RAG baseline runner |
-| [eval/keywords.py](eval/keywords.py) | Regex patterns for filtering |
-| [eval/gold_standard.json](eval/gold_standard.json) | 40 test cases |
-| [run_all_experiments.py](run_all_experiments.py) | Parallel experiment runner |
+| [rag/retriever.py](../rag/retriever.py) | Hybrid semantic+BM25 retrieval |
+| [rag/embeddings.py](../rag/embeddings.py) | Vector embedding with BGE-large |
+| [rag/index.py](../rag/index.py) | FAISS index loading |
+| [rag/bm25_search.py](../rag/bm25_search.py) | BM25 keyword search |
+| [rag/schemas.py](../rag/schemas.py) | Output Pydantic models |
+| [rlm/rlm_controller.py](../rlm/rlm_controller.py) | Controller-Driven orchestration |
+| [rlm/rlm_environment.py](../rlm/rlm_environment.py) | Tool implementations |
+| [rlm/paragraph_index.py](../rlm/paragraph_index.py) | Paragraph-level indexing |
+| [eval/run_eval.py](../eval/run_eval.py) | CLI entry point |
+| [eval/evaluator.py](../eval/evaluator.py) | Scoring logic |
+| [eval/experiment_config.py](../eval/experiment_config.py) | Prompts, costs, configs |
+| [eval/rag_runner.py](../eval/rag_runner.py) | RAG baseline runner |
+| [eval/keywords.py](../eval/keywords.py) | Regex patterns for filtering |
+| [eval/gold_standard.json](../eval/gold_standard.json) | 40 test cases |
+| [run_all_experiments.py](../run_all_experiments.py) | Parallel experiment runner |
