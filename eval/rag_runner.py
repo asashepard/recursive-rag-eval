@@ -149,8 +149,13 @@ class RAGRunner:
                 include_federal=True,
             )
             
-            # Merge and dedupe (state results first, then federal)
-            results = self._merge_results(state_results, fed_results)
+            # Merge with guaranteed FED slots (fairness fix)
+            results = self._merge_results(
+                state_results, 
+                fed_results,
+                total_slots=self.top_k,
+                min_fed_slots=3,
+            )
         
         cost.add_retrieval()
         
@@ -178,6 +183,8 @@ class RAGRunner:
         )
         
         # Step 4: Single LLM call
+        # GPT-5.x uses max_completion_tokens instead of max_tokens
+        max_tokens_param = "max_completion_tokens" if self.model.startswith("gpt-5") else "max_tokens"
         try:
             response = self.client.chat.completions.create(
                 model=self.model,
@@ -187,7 +194,7 @@ class RAGRunner:
                 ],
                 response_format={"type": "json_object"},
                 temperature=self.temperature,
-                max_tokens=MAX_OUTPUT_TOKENS,
+                **{max_tokens_param: MAX_OUTPUT_TOKENS},
             )
             
             # Track cost
@@ -222,6 +229,9 @@ class RAGRunner:
                     citations=citations,
                 ))
             
+            # Rank and limit obligations
+            obligations = self._rank_and_limit_obligations(obligations, max_obligations=3)
+            
             confidence = "high" if obligations else "low"
             return StateObligations(
                 obligations=obligations,
@@ -230,43 +240,94 @@ class RAGRunner:
             )
                 
         except Exception as e:
+            import traceback
+            print(f"  [RAG ERROR] {type(e).__name__}: {str(e)[:100]}")
+            traceback.print_exc()
             return StateObligations(
                 obligations=[],
                 confidence="low",
                 not_found_explanation=f"Error: {str(e)}",
             )
 
+    def _rank_and_limit_obligations(
+        self,
+        obligations: list[Obligation],
+        max_obligations: int = 3,
+    ) -> list[Obligation]:
+        """
+        Rank obligations by completeness (deadline + notify_who) and limit count.
+        
+        Scoring:
+        - +2 if has deadline
+        - +1 if has notify_who  
+        - Ties broken by obligation text length (shorter = more specific)
+        """
+        if not obligations:
+            return []
+        
+        def score(ob: Obligation) -> tuple:
+            s = 0
+            if ob.deadline:
+                s += 2
+            if ob.notify_who:
+                s += 1
+            # Negative length for tie-breaking (shorter first)
+            return (-s, len(ob.obligation or ""))
+        
+        ranked = sorted(obligations, key=score)
+        return ranked[:max_obligations]
+
     def _merge_results(
         self,
         state_results: list[tuple],
         fed_results: list[tuple],
+        total_slots: int = 10,
+        min_fed_slots: int = 3,
     ) -> list[tuple]:
         """
-        Merge state and federal retrieval results, deduplicating by chunk_id.
-        State results are prioritized (appear first).
+        Merge state and federal retrieval results with guaranteed FED representation.
+        
+        FAIRNESS FIX: Reserve minimum slots for federal documents to ensure they
+        always appear in the LLM context. This matches RLM behavior where FED is
+        processed as a separate state and competes fairly at the obligation level.
         
         Args:
             state_results: List of (Chunk, score) tuples from state query
             fed_results: List of (Chunk, score) tuples from federal query
+            total_slots: Total slots available for LLM context (matches top_k)
+            min_fed_slots: Minimum slots reserved for federal documents
             
         Returns:
-            Merged list with duplicates removed
+            Merged list with guaranteed FED representation, max total_slots items
         """
         seen_ids = set()
-        merged = []
         
-        # Add state results first (higher priority)
+        # Calculate slot allocation
+        # Reserve min_fed_slots for FED, give rest to state
+        max_state_slots = total_slots - min_fed_slots
+        
+        # Collect state results (up to max_state_slots)
+        state_chunk_list = []
         for chunk, score in state_results:
             chunk_id = getattr(chunk, 'chunk_id', None) or id(chunk)
             if chunk_id not in seen_ids:
                 seen_ids.add(chunk_id)
-                merged.append((chunk, score))
+                state_chunk_list.append((chunk, score))
+                if len(state_chunk_list) >= max_state_slots:
+                    break
         
-        # Add federal results (lower priority, dedupe)
+        # Collect FED results (remaining slots, but at least min_fed_slots)
+        remaining_slots = total_slots - len(state_chunk_list)
+        fed_chunk_list = []
         for chunk, score in fed_results:
             chunk_id = getattr(chunk, 'chunk_id', None) or id(chunk)
             if chunk_id not in seen_ids:
                 seen_ids.add(chunk_id)
-                merged.append((chunk, score))
+                fed_chunk_list.append((chunk, score))
+                if len(fed_chunk_list) >= remaining_slots:
+                    break
+        
+        # Interleave: state first, then FED (preserves priority within each)
+        merged = state_chunk_list + fed_chunk_list
         
         return merged

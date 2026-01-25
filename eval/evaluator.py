@@ -95,6 +95,7 @@ class QueryResult:
     found_obligations: list[Obligation] = field(default_factory=list)
     # Metrics
     critical_miss: bool = False  # True if gold exists but not found
+    gold_match_position: Optional[int] = None  # Index of matched obligation (0 = top-1)
     false_positive_count: int = 0
     negative_test_passed: Optional[bool] = None  # True if correctly returned no obligation
     citation_valid_count: int = 0
@@ -147,6 +148,10 @@ class EvalSummary:
     # Critical miss
     critical_misses: int = 0
     critical_miss_rate: float = 0.0
+    
+    # Top-1 hit rate (gold found at position 0)
+    top1_hits: int = 0
+    top1_hit_rate: float = 0.0
     
     # Citation validity
     valid_citations: int = 0
@@ -207,6 +212,11 @@ class EvalSummary:
         self.critical_misses = sum(1 for r in positive_results if r.critical_miss)
         if len(positive_results) > 0:
             self.critical_miss_rate = self.critical_misses / len(positive_results)
+        
+        # Top-1 hit rate (gold found at position 0)
+        self.top1_hits = sum(1 for r in positive_results if r.gold_match_position == 0)
+        if len(positive_results) > 0:
+            self.top1_hit_rate = self.top1_hits / len(positive_results)
         
         # Citation validity
         self.valid_citations = sum(r.citation_valid_count for r in results)
@@ -396,11 +406,13 @@ class Evaluator:
         valid_doc_ids = set(gold.get("valid_doc_ids", [gold["cite"]["doc_id"]]))
         
         matched = False
-        for ob in result.found_obligations:
+        matched_idx = None
+        for idx, ob in enumerate(result.found_obligations):
             # Check if any citation points to a valid doc
             for cit in ob.citations:
                 if cit.doc_id in valid_doc_ids:
                     matched = True
+                    matched_idx = idx
                     
                     # Check field accuracy
                     if gold.get("deadline"):
@@ -419,6 +431,7 @@ class Evaluator:
                 break
         
         result.critical_miss = not matched
+        result.gold_match_position = matched_idx
         
         # False positives: obligations that don't cite any valid doc
         # For state queries, FED docs are also valid (federal baseline applies)
@@ -548,6 +561,12 @@ class Evaluator:
         print(f"{'=' * 40}")
         print(f"  Misses: {summary.critical_misses} / {summary.queries_with_gold}")
         print(f"  Rate: {summary.critical_miss_rate:.1%}")
+        
+        print(f"\n{'=' * 40}")
+        print("TOP-1 HIT RATE (ranking quality)")
+        print(f"{'=' * 40}")
+        print(f"  Top-1 Hits: {summary.top1_hits} / {summary.queries_with_gold}")
+        print(f"  Rate: {summary.top1_hit_rate:.1%}")
         
         if summary.negative_tests > 0:
             print(f"\n{'=' * 40}")

@@ -152,6 +152,16 @@ def generate_comparison_report(data: dict):
             row += f" {'N/A':>10}"
     print(row)
     
+    # Top-1 Hit Rate (ranking quality)
+    row = f"{'Top-1 Hit Rate':<32}"
+    for exp in EXPERIMENTS:
+        if exp in data:
+            rate = data[exp]["summary"].get("top1_hit_rate", 0)
+            row += f" {rate*100:>9.1f}%"
+        else:
+            row += f" {'N/A':>10}"
+    print(row)
+    
     # Negative Test Accuracy (new)
     row = f"{'Negative Test Accuracy':<32}"
     for exp in EXPERIMENTS:

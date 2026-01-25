@@ -105,6 +105,11 @@ def parse_args():
         default=None,
         help="Specific query IDs to run (default: all)"
     )
+    parser.add_argument(
+        "--verbose", "-v",
+        action="store_true",
+        help="Show detailed RLM extraction logs (default: condensed progress)"
+    )
     return parser.parse_args()
 
 
@@ -241,6 +246,7 @@ def main():
             model=model,
             max_iterations=12,
             retrieval_mode=exp_config.retrieval_mode,
+            verbose=args.verbose,
         )
     
     # Run queries and track total cost

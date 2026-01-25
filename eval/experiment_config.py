@@ -94,7 +94,14 @@ TASK DEFINITION:
 REGULATORY TEXT:
 {context}
 
-Extract all compliance obligations from the text above.
+Extract the PRIMARY compliance obligation(s) from the text above.
+
+PRIORITIZATION RULES:
+1. Prefer obligations with EXPLICIT deadlines (e.g., "within 6 hours", "24 hours")
+2. Prefer obligations with EXPLICIT notification recipients (notify_who)
+3. Prefer state-specific requirements over general procedural steps
+4. Return at most 3 obligations total - only the most actionable and specific
+5. Do NOT extract internal procedural steps (e.g., "update ticket", "create incident log")
 
 For each obligation, provide:
 - obligation: What must be done

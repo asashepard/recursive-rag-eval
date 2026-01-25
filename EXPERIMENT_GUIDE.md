@@ -192,6 +192,21 @@ The following differences between RAG and Controller-Driven are **intentional ar
 
 **Rationale:** Controller-Driven compensates with iteration; reranking would slow down the exploration loop.
 
+### 5. Output Limiting (Fairness Control)
+
+| System | Approach |
+|--------|----------|
+| RAG | Ranks obligations by completeness, returns top 3 |
+| Controller-Driven | Ranks obligations by completeness, returns top 3 globally |
+
+**Rationale:** Both systems now return at most 3 obligations total, ranked by:
+1. Has deadline (+2 points)
+2. Has notify_who (+1 point)
+3. Shorter text preferred (more specific)
+4. State-specific preferred over federal for ties
+
+This ensures neither system gains an unfair advantage by returning more candidates.
+
 ### Impact on Interpretation
 
 These asymmetries mean the experiment tests the **combined effect** of:

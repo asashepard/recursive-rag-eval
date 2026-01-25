@@ -126,12 +126,14 @@ class RLMController:
         model: str = MODEL,
         max_iterations: int = MAX_ITERATIONS_GLOBAL,
         retrieval_mode: str = "hybrid",  # "hybrid", "bm25", "semantic"
+        verbose: bool = False,  # Detailed extraction logs vs condensed progress
     ):
         global _PROMPT_HASH
         
         self.model = model
         self.max_iterations = max_iterations
         self.retrieval_mode = retrieval_mode
+        self.verbose = verbose
         self.client = OpenAI()
         self.env = RLMEnvironment(retrieval_mode=retrieval_mode)
         self.iteration_count = 0
@@ -211,6 +213,39 @@ class RLMController:
             
             print(f"  Result: {len(obligations)} obligations, confidence={confidence}")
         
+        # Final global ranking: combine all obligations and keep top 3 total
+        all_obligations = []
+        for state, so in state_results.items():
+            for ob in so.obligations:
+                all_obligations.append((state, ob))
+        
+        # Rank by completeness (deadline + notify_who) and limit globally
+        def score(item: tuple) -> tuple:
+            state, ob = item
+            s = 0
+            if ob.deadline:
+                s += 2
+            if ob.notify_who:
+                s += 1
+            # Prefer state-specific over FED for ties
+            state_priority = 1 if state == "FED" else 0
+            return (-s, state_priority, len(ob.obligation or ""))
+        
+        all_obligations.sort(key=score)
+        top_obligations = all_obligations[:3]  # Global cap of 3
+        
+        if len(all_obligations) > 3:
+            print(f"\n  [Global Limit] Kept top 3 of {len(all_obligations)} total obligations")
+        
+        # Rebuild state_results with only top obligations
+        for state in state_results:
+            kept = [ob for s, ob in top_obligations if s == state]
+            state_results[state] = StateObligations(
+                obligations=kept,
+                confidence=state_results[state].confidence,
+                not_found_explanation=state_results[state].not_found_explanation,
+            )
+        
         # Build final response
         response = self._build_response(activity, state_results)
         
@@ -277,6 +312,9 @@ class RLMController:
         # Deduplicate exact duplicates
         obligations = self._dedupe_obligations(obligations)
         
+        # Rank by completeness and limit to max
+        obligations = self._rank_and_limit_obligations(obligations, max_obligations=3)
+        
         return obligations
     
     def _dedupe_obligations(self, obligations: list[Obligation]) -> list[Obligation]:
@@ -313,6 +351,38 @@ class RLMController:
             print(f"      [Dedup] Removed {len(obligations) - len(unique)} duplicate(s)")
         
         return unique
+    
+    def _rank_and_limit_obligations(
+        self,
+        obligations: list[Obligation],
+        max_obligations: int = 3,
+    ) -> list[Obligation]:
+        """
+        Rank obligations by completeness (deadline + notify_who) and limit count.
+        
+        Scoring:
+        - +2 if has deadline
+        - +1 if has notify_who  
+        - Ties broken by obligation text length (shorter = more specific)
+        """
+        if not obligations:
+            return []
+        
+        def score(ob: Obligation) -> tuple:
+            s = 0
+            if ob.deadline:
+                s += 2
+            if ob.notify_who:
+                s += 1
+            # Negative length for tie-breaking (shorter first)
+            return (-s, len(ob.obligation or ""))
+        
+        ranked = sorted(obligations, key=score)
+        
+        if len(obligations) > max_obligations:
+            print(f"      [Limit] Kept top {max_obligations} of {len(obligations)} obligations")
+        
+        return ranked[:max_obligations]
     
     def _discover_documents(self, activity: str, state: str, utility_domain: str) -> list[str]:
         """
@@ -435,13 +505,15 @@ Requirements:
 Return ONLY a JSON object with an "expansions" array of strings.
 Example: {{"expansions": ["event notification", "breach disclosure", "incident notice", "cyber event report", "security occurrence", "reportable incident"]}}"""
 
+        # GPT-5.x uses max_completion_tokens instead of max_tokens
+        max_tokens_param = "max_completion_tokens" if self.model.startswith("gpt-5") else "max_tokens"
         try:
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[{"role": "user", "content": expansion_prompt}],
                 response_format={"type": "json_object"},
                 temperature=0,  # Deterministic for reproducibility
-                max_tokens=200,  # Room for 6 expansions
+                **{max_tokens_param: 200},  # Room for 6 expansions
             )
             
             # Track token usage
@@ -465,11 +537,13 @@ Example: {{"expansions": ["event notification", "breach disclosure", "incident n
                     queries.append(exp)
                     added += 1
             
-            print(f"      [Query Expansion] {activity} → {queries}")
+            if self.verbose:
+                print(f"      [Query Expansion] {activity} → {queries}")
             
         except (json.JSONDecodeError, ValueError, KeyError) as e:
             # Fallback: just use original query
-            print(f"      [Query Expansion] Failed, using original: {activity}")
+            if self.verbose:
+                print(f"      [Query Expansion] Failed, using original: {activity}")
         
         return queries[:5]  # Original + up to 4 expansions
     
@@ -518,50 +592,86 @@ Example: {{"expansions": ["event notification", "breach disclosure", "incident n
         
         print(f"      Found {len(obligation_spans)} candidate spans (filtered from {len(spans)})")
         
-        obligations = []
+        # =========================================================================
+        # OPTIMIZED EXTRACTION: Extract first, verify/repair only top candidates
+        # This reduces LLM calls from O(spans*obligations) to O(top_k)
+        # =========================================================================
+        
+        # Phase 1: Extract obligations WITHOUT verification (fast pass)
+        raw_obligations = []  # List of (obligation, paragraph_text, span_idx) tuples
         
         for i, span in enumerate(obligation_spans[:span_budget]):
-            # Retrieve full text (already fetched above, but re-fetching is cheap)
             full_span = self.env.get_paragraph(span["span_id"])
             if not full_span:
                 continue
             
-            # Double-check full text for obligation language
             if not self._has_obligation_language(full_span["text"]):
-                print(f"        [Span {i+1}] Skipped: no obligation language in full text")
                 continue
             
-            # Get context window (includes preceding paragraph for split obligations)
             context_text = self._get_context_window(span["span_id"], doc_id)
-            
-            # Extract ALL obligations from this span with contextual window
             full_span_with_context = {**full_span, "text": context_text}
-            extracted_obligations = self._extract_obligation_from_span(full_span_with_context, doc_id, activity, state)
-            if extracted_obligations:
-                # ---------------------------------------------------------------------------
-                # VERIFICATION + REPAIR: Validate each obligation against cited evidence
-                # - If activity_match fails: DROP the obligation
-                # - If fields missing/not evidenced: attempt ONE repair using same paragraph
-                # Use original span text for verification (not the context window)
-                # ---------------------------------------------------------------------------
-                for obligation in extracted_obligations:
-                    verified_obligation = self._verify_and_repair(
-                        obligation, full_span["text"], activity
-                    )
-                    
-                    if verified_obligation is None:
-                        # Dropped by verifier (activity_match = false)
-                        ob_preview = obligation.obligation[:60] if obligation.obligation else "N/A"
-                        print(f"        [Span {i+1}] DROPPED by verifier: {ob_preview}...")
-                        continue
-                    
-                    obligations.append(verified_obligation)
-                    ob_preview = verified_obligation.obligation[:60] if verified_obligation.obligation else "N/A"
-                    dl = f" [deadline: {verified_obligation.deadline}]" if verified_obligation.deadline else ""
-                    nw = f" [notify: {verified_obligation.notify_who[:20]}...]" if verified_obligation.notify_who else ""
-                    print(f"        [Span {i+1}] Extracted: {ob_preview}...{dl}{nw}")
-            else:
-                print(f"        [Span {i+1}] No obligation found")
+            
+            extracted = self._extract_obligation_from_span(full_span_with_context, doc_id, activity, state)
+            if extracted:
+                for ob in extracted:
+                    raw_obligations.append((ob, full_span["text"], i + 1))
+        
+        if not raw_obligations:
+            print(f"      No obligations extracted")
+            return []
+        
+        # Phase 2: Rank raw obligations by completeness (no LLM)
+        def score_raw(item: tuple) -> tuple:
+            ob, _, _ = item
+            s = 0
+            if ob.deadline:
+                s += 2
+            if ob.notify_who:
+                s += 1
+            return (-s, len(ob.obligation or ""))
+        
+        raw_obligations.sort(key=score_raw)
+        
+        # Phase 3: Verify/repair only top 6 candidates (2x the final cap)
+        TOP_K_TO_VERIFY = 6
+        obligations = []
+        verified_count = 0
+        dropped_count = 0
+        repaired_count = 0
+        
+        for ob, paragraph_text, span_idx in raw_obligations[:TOP_K_TO_VERIFY]:
+            verified = self._verify_and_repair(ob, paragraph_text, activity)
+            
+            if verified is None:
+                dropped_count += 1
+                if self.verbose:
+                    ob_preview = ob.obligation[:60] if ob.obligation else "N/A"
+                    print(f"        [Span {span_idx}] DROPPED by verifier: {ob_preview}...")
+                continue
+            
+            verified_count += 1
+            # Check if repair happened (fields now present that weren't before)
+            if (verified.deadline and not ob.deadline) or (verified.notify_who and not ob.notify_who):
+                repaired_count += 1
+            
+            obligations.append(verified)
+            if self.verbose:
+                ob_preview = verified.obligation[:60] if verified.obligation else "N/A"
+                dl = f" [deadline: {verified.deadline}]" if verified.deadline else ""
+                nw = f" [notify: {verified.notify_who[:20]}...]" if verified.notify_who else ""
+                print(f"        [Span {span_idx}] Extracted: {ob_preview}...{dl}{nw}")
+        
+        # Condensed progress (always shown)
+        if not self.verbose:
+            # Show compact summary with emojis for quick scanning
+            status_parts = [f"✓{verified_count}"]
+            if dropped_count > 0:
+                status_parts.append(f"✗{dropped_count}")
+            if repaired_count > 0:
+                status_parts.append(f"🔧{repaired_count}")
+            print(f"      [{'/'.join(status_parts)}] from {len(raw_obligations)} candidates")
+        elif len(raw_obligations) > TOP_K_TO_VERIFY:
+            print(f"      [Optimization] Verified top {TOP_K_TO_VERIFY} of {len(raw_obligations)} candidates")
         
         return obligations
     
@@ -657,11 +767,13 @@ Example: {{"expansions": ["event notification", "breach disclosure", "incident n
                             updated_deadline = rep_deadline
                             if self._cost:
                                 self._cost.rlm_fields_repaired_deadline += 1
-                            print(f"          [Repair] deadline: {rep_deadline}")
+                            if self.verbose:
+                                print(f"          [Repair] deadline: {rep_deadline}")
                         else:
                             if self._cost:
                                 self._cost.rlm_repair_rejected_deadline += 1
-                            print(f"          [Repair REJECTED] deadline not in quote")
+                            if self.verbose:
+                                print(f"          [Repair REJECTED] deadline not in quote")
                 
                 # Try to repair notify_who
                 if needs_notify_repair and not updated_notify:
@@ -673,11 +785,13 @@ Example: {{"expansions": ["event notification", "breach disclosure", "incident n
                             updated_notify = rep_notify
                             if self._cost:
                                 self._cost.rlm_fields_repaired_notify += 1
-                            print(f"          [Repair] notify_who: {rep_notify}")
+                            if self.verbose:
+                                print(f"          [Repair] notify_who: {rep_notify}")
                         else:
                             if self._cost:
                                 self._cost.rlm_repair_rejected_notify += 1
-                            print(f"          [Repair REJECTED] notify_who not in quote")
+                            if self.verbose:
+                                print(f"          [Repair REJECTED] notify_who not in quote")
         
         # Build updated obligation
         return Obligation(

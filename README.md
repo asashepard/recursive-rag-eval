@@ -4,6 +4,43 @@
 
 ---
 
+## Results Summary (January 2026)
+
+### Model Comparison (40 queries)
+
+| Metric | gpt-4o-mini |  | gpt-5.2 (SOTA) |  |
+|--------|-------------|---|----------------|---|
+|        | RAG | RLM | RAG | RLM |
+| **Critical Miss Rate** ↓ | 21.4% | **14.3%** | 25.0% | **21.4%** |
+| **Negative Test Accuracy** ↑ | 8.3% | **50.0%** | 16.7% | **66.7%** |
+| **False Obligation Rate** ↓ | 34.5% | **23.4%** | 37.6% | **20.2%** |
+| **Deadline Accuracy** ↑ | 40.9% | 41.7% | 52.4% | **72.7%** |
+| Notify Who Accuracy | 54.5% | 54.2% | **61.9%** | 50.0% |
+
+### Cost (40 queries)
+
+| Model | RAG | RLM | Total |
+|-------|-----|-----|-------|
+| gpt-4o-mini | $0.10 | $0.24 | **$0.34** |
+| gpt-5.2 | $1.08 | $5.13 | **$6.21** |
+
+### Key Findings
+
+1. **Architecture matters at SOTA**: RLM beats RAG on false positive suppression even with GPT-5.2 (66.7% vs 16.7% negative test accuracy)
+
+2. **Verification is model-independent**: RLM's verification step dropped 72% of candidates with GPT-5.2 (vs 56% with mini) — smarter models are stricter
+
+3. **Repair loop + SOTA = best field accuracy**: RLM + GPT-5.2 achieves 72.7% deadline accuracy (vs 41.7% with mini)
+
+4. **Trade-off guidance**:
+   - Minimize cost: RAG + gpt-4o-mini ($0.10)
+   - Minimize false positives: RLM + GPT-5.2 (20.2% false rate)
+   - Best field extraction: RLM + GPT-5.2 (72.7% deadline accuracy)
+
+See [eval/results/](eval/results/) for detailed per-query breakdowns.
+
+---
+
 ## TL;DR
 
 | | RAG | Controller-Driven |
