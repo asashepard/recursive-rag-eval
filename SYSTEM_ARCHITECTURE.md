@@ -97,27 +97,33 @@ Orchestrates retrieval and extraction:
 ```python
 class RAGRunner:
     def research(self, activity, states):
-        # 1. Retrieve chunks (includes both state and federal docs)
-        results = self.retriever.retrieve(query_text, states)
+        # 1. Retrieve state-specific chunks
+        state_results = self.retriever.retrieve(query_text, states=[state])
         
-        # 2. Build context from chunks
-        context = self._format_chunks(results)
+        # 2. Retrieve federal chunks (always included)
+        fed_results = self.retriever.retrieve(fed_query, states=["FED"])
         
-        # 3. Single LLM call with unified prompt
+        # 3. Merge with guaranteed FED slots (fairness fix)
+        #    Reserves min 3 slots for FED to prevent state results from
+        #    crowding out federal documents in the LLM context
+        results = self._merge_results(state_results, fed_results, 
+                                       total_slots=10, min_fed_slots=3)
+        
+        # 4. Single LLM call with unified prompt
         response = self.client.chat.completions.create(
             model=self.model,
-            messages=[
-                {"role": "system", "content": EXTRACTION_SYSTEM_PROMPT},
-                {"role": "user", "content": EXTRACTION_USER_TEMPLATE.format(...)},
-            ],
+            messages=[...],
             response_format={"type": "json_object"},
+            **{max_tokens_param: MAX_OUTPUT_TOKENS},  # GPT-5.x compatibility
         )
         
-        # 4. Parse and return
-        return ActivityResponse(...)
+        # 5. Rank and limit to top 3 obligations
+        return self._rank_and_limit_obligations(obligations, max_obligations=3)
 ```
 
 **No Pre-LLM Gating:** The LLM is always called when retrieval returns chunks. Negative test behavior relies solely on prompt instructions ("return empty array if no obligations found").
+
+**GPT-5.x Compatibility:** Uses `max_completion_tokens` parameter for GPT-5.x models, `max_tokens` for older models.
 
 ---
 
@@ -139,6 +145,10 @@ The main orchestration loop:
 
 ```python
 class RLMController:
+    def __init__(self, model="gpt-4o-mini", verbose=False):
+        self.model = model
+        self.verbose = verbose  # Controls output detail level
+        
     def research(self, activity, states):
         for state in states:
             # Phase 1: Discover documents
@@ -149,8 +159,11 @@ class RLMController:
                 obligations = self._extract_from_document(doc_id, activity, state)
                 state_results.extend(obligations)
         
-        return self._build_response(activity, state_results)
+        # Phase 3: Global ranking - keep top 3 obligations across all states
+        return self._rank_and_limit_globally(state_results, max_obligations=3)
 ```
+
+**Verbose Mode:** Pass `verbose=True` to see per-span extraction details. Default condensed output shows progress as `[✓N/✗M/🔧K]` (verified/dropped/repaired).
 
 #### Budget Controls
 
@@ -160,7 +173,8 @@ Hardcoded limits prevent runaway execution:
 MAX_ITERATIONS_GLOBAL = 12      # Total operations cap
 MAX_TOOL_CALLS_PER_STATE = 6    # Per-state tool calls
 MAX_DOCS_PER_STATE = 2          # Documents to explore per state
-MAX_SPANS_PER_STATE = 10        # Paragraphs to read per state (increased for better recall)
+MAX_SPANS_PER_STATE = 10        # Paragraphs to read per state
+TOP_CANDIDATES_TO_VERIFY = 6    # Only verify/repair top 6 candidates (optimization)
 ```
 
 #### Document Discovery

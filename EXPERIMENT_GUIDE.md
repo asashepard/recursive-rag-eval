@@ -24,6 +24,15 @@ python -m eval.run_eval --experiment rag
 
 # Controller-Driven with iterative search
 python -m eval.run_eval --experiment rlm
+
+# With specific model
+python -m eval.run_eval --experiment rlm --model gpt-5.2
+
+# Verbose output (shows per-span extraction details)
+python -m eval.run_eval --experiment rlm --verbose
+
+# Filter by state/activity
+python -m eval.run_eval --experiment rlm --states NJ MD --activities "incident reporting"
 ```
 
 ### Code Layout Note (Why `eval/rag_runner.py` exists)
@@ -358,13 +367,19 @@ $env:OPENAI_API_KEY = "sk-..."
 echo "OPENAI_API_KEY=sk-..." > .env
 ```
 
-### Running with a different model (experimental)
+### Running with a different model
 
 ```bash
 python run_all_experiments.py --model gpt-4o-mini
+python run_all_experiments.py --model gpt-5.2
 ```
 
-**Important:** All configs in a single run use the same model, ensuring fair comparison within that run. However, results from different models are not directly comparable—weaker models may struggle with the iterative Controller-Driven approach while performing adequately on single-shot RAG.
+**Model Compatibility Notes:**
+- GPT-5.x models require `max_completion_tokens` instead of `max_tokens`. The system auto-detects model prefix and uses the correct parameter.
+- Temperature is locked to 0 for all models to ensure deterministic extraction.
+- Default model is `gpt-4o-mini` (good cost/quality tradeoff for this task).
+
+**Important:** All configs in a single run use the same model, ensuring fair comparison within that run. However, results from different models are not directly comparable—GPT-5.x tends to be more conservative (fewer false positives but may miss edge cases), while GPT-4o-mini is more aggressive (higher recall but more false positives).
 
 ### Filtering to specific states
 

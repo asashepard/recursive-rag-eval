@@ -6,6 +6,12 @@
 
 ## Results Summary (January 2026)
 
+### Results Visualization
+
+![RAG vs RLM Performance Comparison](docs/results_chart.png)
+
+*★ indicates best result for each metric. ↑ = higher is better, ↓ = lower is better.*
+
 ### Model Comparison (40 queries)
 
 | Metric | gpt-4o-mini |  | gpt-5.2 (SOTA) |  |
@@ -26,18 +32,22 @@
 
 ### Key Findings
 
-1. **Architecture matters at SOTA**: RLM beats RAG on false positive suppression even with GPT-5.2 (66.7% vs 16.7% negative test accuracy)
+1. **Architecture still matters at SOTA (precision)**: Controller-Driven (RLM) is much better at suppressing false positives on negatives (66.7% vs 16.7% negative test accuracy with GPT-5.2) and lowers the false obligation rate (20.2% vs 37.6%).
 
-2. **Verification is model-independent**: RLM's verification step dropped 72% of candidates with GPT-5.2 (vs 56% with mini) — smarter models are stricter
+2. **More capable model ≠ higher recall here**: In this benchmark, GPT-5.2 increased critical miss rate for both strategies (RAG: 21.4% → 25.0%, RLM: 14.3% → 21.4%), suggesting it is more conservative about what counts as an obligation.
 
-3. **Repair loop + SOTA = best field accuracy**: RLM + GPT-5.2 achieves 72.7% deadline accuracy (vs 41.7% with mini)
+3. **Verification is a precision/recall trade-off**: RLM’s verifier rejected a larger share of extracted candidates with GPT-5.2 (72% vs 56% with gpt-4o-mini). That helps precision, but can also drop legitimate-but-weakly-evidenced obligations.
 
-4. **Trade-off guidance**:
-   - Minimize cost: RAG + gpt-4o-mini ($0.10)
-   - Minimize false positives: RLM + GPT-5.2 (20.2% false rate)
-   - Best field extraction: RLM + GPT-5.2 (72.7% deadline accuracy)
+4. **Repair loop shines when the obligation is found**: With GPT-5.2, RLM achieved the best deadline accuracy (72.7%), but this is conditional on the obligation being correctly located first.
 
-See [eval/results/](eval/results/) for detailed per-query breakdowns.
+5. **Trade-off guidance (given this 40-query test set)**:
+   - Minimize cost: RAG + gpt-4o-mini ($0.10 / 40 queries)
+   - Minimize false positives: RLM + GPT-5.2 (best negative accuracy + lowest false obligation rate), at much higher cost
+   - Best deadline-field extraction: RLM + GPT-5.2 (72.7% deadline accuracy), also at much higher cost
+
+*Caveat: Results are from a 40-query gold standard; treat them as directional rather than definitive.*
+
+Run `python run_all_experiments.py` to run **both** strategies on the full 40-query suite and write a timestamped comparison report to `eval/results/comparison_report_*.txt` (plus per-run JSON + logs).
 
 ---
 
@@ -100,12 +110,13 @@ Both strategies use identical:
 
 | Control | Value |
 |---------|-------|
-| LLM model | `gpt-4o` (configurable) |
-| Temperature | `0` (minimizes sampling variance) |
+| LLM model | `gpt-4o-mini` default (configurable via `--model`) |
+| Temperature | `0` (deterministic, locked) |
 | Extraction prompt | Hash-verified at runtime |
 | Output schema | Same Pydantic models |
 | Corpus | 17 regulatory documents |
 | Scoring | Same evaluator logic |
+| Output limit | Top 3 obligations (ranked by completeness) |
 
 The **only variable** is evidence consumption strategy.
 
@@ -126,10 +137,11 @@ $env:OPENAI_API_KEY = "sk-..."  # PowerShell
 # Run both strategies on 40 test queries
 python run_all_experiments.py
 
-# Results written to:
-#   eval/results/comparison_report_YYYYMMDD_HHMMSS.txt
-#   eval/results/eval_rag_*.json
-#   eval/results/eval_rlm_*.json
+# With different model
+python run_all_experiments.py --model gpt-5.2
+
+# Verbose output (shows per-span extraction details)
+python -m eval.run_eval --experiment rlm --verbose
 ```
 
 **One-off debugging:**
@@ -146,14 +158,13 @@ The comparison report shows metrics side-by-side:
 
 | Metric | What it measures |
 |--------|------------------|
-| **Critical Miss Rate** | % of positive cases where obligation not found (lower = better) |
+| **Critical Miss Rate** | % of positive cases where gold obligation not found (lower = better) |
 | **Negative Test Accuracy** | % of negative cases with no false positives (higher = better) |
-| **Deadline/Notify Accuracy** | Field extraction quality |
+| **False Obligation Rate** | % of returned obligations that are incorrect (lower = better) |
+| **Deadline/Notify Accuracy** | Field extraction quality (only for matched obligations) |
 | **Cost** | Tokens and USD |
 
-**Controller-Driven wins if:** Lower miss rate at acceptable cost increase.
-
-See [EXPERIMENT_GUIDE.md](EXPERIMENT_GUIDE.md#metrics) for full metric definitions.
+**Controller-Driven wins if:** Lower miss rate AND lower false positive rate at acceptable cost.
 
 ---
 

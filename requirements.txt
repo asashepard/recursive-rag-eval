@@ -10,6 +10,7 @@ python-dotenv>=1.0.0            # Load .env files - imports as 'dotenv'
 # Data/Schema validation
 pydantic>=2.0.0                 # Data validation and schemas
 numpy>=1.24.0                   # Numerical operations
+matplotlib                      # Plotting library for generating charts
 
 # Text search
 rank-bm25>=0.2.2                # BM25 keyword search
